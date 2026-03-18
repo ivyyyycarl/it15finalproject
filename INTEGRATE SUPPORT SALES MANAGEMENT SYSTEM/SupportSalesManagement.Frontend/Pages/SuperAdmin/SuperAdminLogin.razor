@@ -1,0 +1,248 @@
+@page "/superadmin/login"
+@layout LandingLayout
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@inject AuthenticationService AuthService
+@inject NavigationManager NavigationManager
+@inject ApiClient ApiClient
+
+<PageTitle>Super Admin Secure Portal - ClassicFit</PageTitle>
+
+<style>
+    :root {
+        --steel-blue: #4682B4;
+        --soft-teal: #91C4C3;
+        --mint-green: #B4DEBD;
+        --warm-cream: #FFF9E5;
+        --deep-slate: #2C3E50;
+    }
+
+    .portal-bg {
+        background-color: var(--warm-cream);
+        background-image:
+            radial-gradient(at 0% 0%, rgba(70, 130, 180, 0.05) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(145, 196, 195, 0.1) 0px, transparent 50%);
+    }
+
+    .glass-card {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(70, 130, 180, 0.1);
+        box-shadow: 0 20px 50px rgba(44, 62, 80, 0.08);
+    }
+
+    .btn-steel {
+        background-color: var(--steel-blue);
+        transition: all 0.3s ease;
+    }
+
+    .btn-steel:hover:not(:disabled) {
+        background-color: #36648B;
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px rgba(70, 130, 180, 0.2);
+    }
+
+    .input-portal {
+        border: 2px solid transparent;
+        background-color: #F8FAFC;
+        transition: all 0.2s ease;
+    }
+
+    .input-portal:focus {
+        border-color: var(--soft-teal);
+        background-color: white;
+        box-shadow: 0 0 0 4px rgba(145, 196, 195, 0.15);
+    }
+
+
+</style>
+
+<div class="min-h-screen portal-bg flex flex-col font-sans">
+    <!-- Header -->
+    <header class="p-6 md:p-10 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="w-10 h-10">
+                <img src="/images/classicfit-logo-icon.png?v=20260308" alt="ClassicFit" class="object-cover rounded-lg border border-[#d7e6ef]" />
+            </div>
+            <div>
+                <h1 class="text-lg font-bold text-gray-800 tracking-tight">ClassicFit <span
+                        class="text-steel-blue">Apparel</span></h1>
+                <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Enterprise Sales & Support</p>
+            </div>
+        </div>
+        <div
+            class="hidden sm:flex items-center gap-4 px-4 py-2 bg-white/50 rounded-full border border-gray-100 italic text-[10px] text-gray-400 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+            Verified Secure Transmission Protocol Active
+        </div>
+    </header>
+
+    <!-- Main Section -->
+    <main class="flex-grow flex items-center justify-center p-6">
+        <div class="w-full max-w-md glass-card rounded-[2rem] p-8 md:p-12 transition-all duration-500">
+            @if (lockoutUntil > DateTime.Now)
+            {
+                <div class="text-center py-8">
+                    <div class="w-20 h-20 bg-red-50 text-red-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Account Locked</h2>
+                    <p class="text-gray-500 mb-6">Too many failed attempts. Access is restricted for security. Please try
+                        again in:</p>
+                    <div class="text-3xl font-mono font-bold text-red-600">
+                        @Math.Ceiling((lockoutUntil - DateTime.Now).TotalMinutes) min
+                    </div>
+                </div>
+            }
+            else if (currentStep == 1)
+            {
+                <div class="mb-10 text-center">
+                    <div
+                        class="inline-block px-3 py-1 bg-[#E0F2F1] text-[#00897B] text-[10px] font-bold uppercase tracking-widest rounded-full mb-3">
+                        Gateway Authentication</div>
+                    <h2 class="text-3xl font-bold text-gray-900">Secure Login</h2>
+                    <p class="text-gray-500 mt-2">Administrative identification required.</p>
+                    <p class="text-[8px] text-gray-300 mt-1 uppercase tracking-widest font-bold">Build v2.1.2-SecureAuth</p>
+                </div>
+
+                <EditForm Model="@loginRequest" OnValidSubmit="HandleLogin" class="space-y-6">
+                    <DataAnnotationsValidator />
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Email
+                            Identifier</label>
+                        <InputText @bind-Value="loginRequest.Email" placeholder="admin@classicfit.com"
+                            class="w-full px-6 py-4 rounded-2xl input-portal text-gray-900 transition-all outline-none" />
+                        <ValidationMessage For="@(() => loginRequest.Email)" class="text-red-500 text-xs mt-1 ml-1" />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Access
+                            Credentials</label>
+                        <InputText @bind-Value="loginRequest.Password" type="password" placeholder="••••••••"
+                            class="w-full px-6 py-4 rounded-2xl input-portal text-gray-900 transition-all outline-none" />
+                        <ValidationMessage For="@(() => loginRequest.Password)" class="text-red-500 text-xs mt-1 ml-1" />
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="p-4 bg-red-50 border border-red-100 rounded-2xl flex gap-3 items-start animate-shake">
+                            <svg class="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                            <span class="text-xs text-red-700 leading-tight">@errorMessage</span>
+                        </div>
+                    }
+
+                    <button type="submit" disabled="@isLoading"
+                        class="w-full py-4 btn-steel text-white font-bold rounded-2xl shadow-lg border border-white/10 flex items-center justify-center gap-3 disabled:opacity-50">
+                        @if (isLoading)
+                        {
+                            <div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                            <span>Verifying...</span>
+                        }
+                        else
+                        {
+                            <span>Sign In</span>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                        }
+                    </button>
+
+                    <p class="text-center text-[10px] text-gray-400 font-bold uppercase tracking-widest pt-4">
+                        Authorized Super Admin Personnel Only
+                    </p>
+                </EditForm>
+            }
+            
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="p-8 border-t border-gray-100 bg-white/50">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex flex-col items-center md:items-start gap-1">
+                <p class="text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em]">&copy; 2026 ClassicFit Apparel
+                    Fashion</p>
+                <div class="flex gap-4 text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                    <span>System Node: Global-W-01</span>
+                    <span>SSL Certificate Valid</span>
+                </div>
+            </div>
+            <div class="flex gap-8 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                <a href="/superadmin/system-settings" class="hover:text-steel-blue transition-colors">Privacy Policy</a>
+                <a href="/superadmin/audit" class="hover:text-steel-blue transition-colors">Compliance Hub</a>
+                <a href="/superadmin/security/access-logs" class="hover:text-steel-blue transition-colors">Access Intelligence</a>
+            </div>
+        </div>
+    </footer>
+</div>
+
+@code {
+    private LoginRequest loginRequest = new();
+    private string errorMessage = string.Empty;
+    private bool isLoading = false;
+    private int currentStep = 1;
+    private int failedAttempts = 0;
+    private DateTime lockoutUntil = DateTime.MinValue;
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            loginRequest.Email = loginRequest.Email?.Trim() ?? "";
+            loginRequest.Password = loginRequest.Password?.Trim() ?? "";
+
+            var success = await AuthService.LoginAsync(loginRequest);
+            if (success)
+            {
+                var user = AuthService.CurrentUser;
+                if (user != null && user.Role == UserRole.SuperAdmin)
+                {
+                    NavigationManager.NavigateTo("/superadmin/dashboard");
+                }
+                else
+                {
+                    await AuthService.LogoutAsync();
+                    errorMessage = "Unauthorized: Super Admin clearance level required.";
+                }
+            }
+            else
+            {
+                failedAttempts++;
+                if (failedAttempts >= 5)
+                {
+                    lockoutUntil = DateTime.Now.AddMinutes(5);
+                    errorMessage = "Too many failed attempts. Account locked.";
+                }
+                else
+                {
+                    errorMessage = AuthService.LastLoginError ?? "Invalid credentials. Please verify your email and password.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Infrastructure connection error. Please try again.";
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

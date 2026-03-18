@@ -1,0 +1,453 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject SupportSalesManagement.Frontend.Services.ApiClient ApiClient
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@using Microsoft.AspNetCore.Components.Routing
+
+<div class="customer-theme min-h-screen bg-white" style="font-family: Inter, sans-serif;">
+    <div class="flex min-h-screen">
+        <aside class="hidden md:flex md:flex-col w-72 bg-classic-blue text-white shadow-2xl fixed left-0 top-0 h-screen z-40">
+            <div class="px-5 py-6 border-b border-white/15">
+                <div class="flex items-center gap-3 cursor-pointer" @onclick="@(() => NavigationManager.NavigateTo("/customer/dashboard"))">
+                    <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center shadow-md">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2V9a2 2 0 00-2-2h-1V5a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2zm3-14V5a3 3 0 016 0v2H9z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="font-bold text-lg tracking-wide">ClassicFit</p>
+                        <p class="text-xs text-white/80">Fashion Store</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="px-3 py-4 space-y-1">
+                @if (IsModuleVisible("dashboard"))
+                {
+                <NavLink href="/customer/dashboard" Match="NavLinkMatch.All"
+                         class="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10"
+                         ActiveClass="bg-white/20 font-bold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M4 10v10h6v-6h4v6h6V10" /></svg>
+                    Dashboard
+                </NavLink>
+                }
+                @if (IsModuleVisible("catalog"))
+                {
+                <NavLink href="/customer/shop"
+                         class="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10"
+                         ActiveClass="bg-white/20 font-bold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                    Shop
+                </NavLink>
+                }
+                @if (IsModuleVisible("orders"))
+                {
+                <NavLink href="/customer/orders"
+                         class="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10"
+                         ActiveClass="bg-white/20 font-bold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a3 3 0 006 0M9 5a3 3 0 016 0" /></svg>
+                    My Orders
+                </NavLink>
+                }
+                @if (IsModuleVisible("tickets"))
+                {
+                <NavLink href="/customer/support"
+                         class="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10"
+                         ActiveClass="bg-white/20 font-bold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 4v-4z" /></svg>
+                    Support
+                </NavLink>
+                }
+                @if (IsModuleVisible("notifications"))
+                {
+                <button @onclick="ToggleNotifications" class="relative w-full px-3 py-2.5 rounded-lg hover:bg-white/10 text-left text-sm font-medium transition-colors">
+                    <span class="inline-flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-4-5.7V5a2 2 0 10-4 0v.3A6 6 0 006 11v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0a3 3 0 11-6 0" /></svg>
+                        Notifications
+                    </span>
+                    @if (unreadNotificationCount > 0)
+                    {
+                        <span class="absolute top-1.5 right-2 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1">
+                            @(unreadNotificationCount > 99 ? "99+" : unreadNotificationCount.ToString())
+                        </span>
+                    }
+                </button>
+                }
+                @if (IsModuleVisible("customers"))
+                {
+                <NavLink href="/customer/profile"
+                         class="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10"
+                         ActiveClass="bg-white/20 font-bold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.1 19A7 7 0 0112 15a7 7 0 016.9 4M12 12a4 4 0 100-8 4 4 0 000 8z" /></svg>
+                    Manage My Profile
+                </NavLink>
+                }
+                <button @onclick="Logout" class="w-full px-3 py-2.5 rounded-lg hover:bg-white/10 text-left text-sm font-semibold transition-colors">
+                    <span class="inline-flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H9m4 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" /></svg>
+                        Logout
+                    </span>
+                </button>
+            </nav>
+
+            <div class="mt-auto p-4 border-t border-white/15 space-y-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold truncate">@(CurrentUser?.FirstName ?? "Customer") @(CurrentUser?.LastName ?? "")</p>
+                        <p class="text-xs text-white/70">Customer</p>
+                        <p class="text-[11px] text-cyan-200/90 truncate">@currentBranchLabel</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <div class="flex-1 md:ml-72">
+            <header class="md:hidden sticky top-0 z-30 bg-classic-blue text-white shadow-md">
+                <div class="px-4 h-14 flex items-center justify-between">
+                    <button @onclick="ToggleMobileMenu" class="p-2 rounded-md hover:bg-white/10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                    <div class="text-center min-w-0 px-2">
+                        <p class="font-semibold truncate">ClassicFit</p>
+                        <p class="text-[10px] text-white/80 truncate">@currentBranchLabel</p>
+                    </div>
+                    <button @onclick="ToggleNotifications" class="relative p-2 rounded-md hover:bg-white/10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        @if (unreadNotificationCount > 0)
+                        {
+                            <span class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1">
+                                @(unreadNotificationCount > 99 ? "99+" : unreadNotificationCount.ToString())
+                            </span>
+                        }
+                    </button>
+                </div>
+                @if (mobileMenuOpen)
+                {
+                    <div class="px-4 pb-3 space-y-1 border-t border-white/15">
+                        @if (IsModuleVisible("dashboard"))
+                        {
+                            <NavLink href="/customer/dashboard" Match="NavLinkMatch.All" class="block px-3 py-2 rounded-md text-sm hover:bg-white/10" ActiveClass="bg-white/20 font-bold">Dashboard</NavLink>
+                        }
+                        @if (IsModuleVisible("catalog"))
+                        {
+                            <NavLink href="/customer/shop" class="block px-3 py-2 rounded-md text-sm hover:bg-white/10" ActiveClass="bg-white/20 font-bold">Shop</NavLink>
+                        }
+                        @if (IsModuleVisible("orders"))
+                        {
+                            <NavLink href="/customer/orders" class="block px-3 py-2 rounded-md text-sm hover:bg-white/10" ActiveClass="bg-white/20 font-bold">My Orders</NavLink>
+                        }
+                        @if (IsModuleVisible("tickets"))
+                        {
+                            <NavLink href="/customer/support" class="block px-3 py-2 rounded-md text-sm hover:bg-white/10" ActiveClass="bg-white/20 font-bold">Support</NavLink>
+                        }
+                        @if (IsModuleVisible("notifications"))
+                        {
+                            <button @onclick="ToggleNotifications" class="block w-full text-left px-3 py-2 rounded-md text-sm hover:bg-white/10">Notifications</button>
+                        }
+                        @if (IsModuleVisible("customers"))
+                        {
+                            <NavLink href="/customer/profile" class="block px-3 py-2 rounded-md text-sm hover:bg-white/10" ActiveClass="bg-white/20 font-bold">Manage My Profile</NavLink>
+                        }
+                        <button @onclick="Logout" class="block w-full text-left px-3 py-2 rounded-md text-sm hover:bg-white/10">Logout</button>
+                    </div>
+                }
+            </header>
+
+            @if (showNotifications)
+            {
+                <div class="fixed inset-0 z-40" @onclick="() => showNotifications = false"></div>
+                <div class="fixed right-4 top-16 md:top-4 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+                    <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-gray-900">Notifications</h3>
+                        @if (unreadNotificationCount > 0)
+                        {
+                            <button @onclick="MarkAllAsRead" class="text-xs text-blue-600 hover:underline font-medium">
+                                Mark all read
+                            </button>
+                        }
+                    </div>
+                    <div class="max-h-80 overflow-y-auto">
+                        @if (notifications.Any())
+                        {
+                            @foreach (var notif in notifications.Take(10))
+                            {
+                                <div class="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors @(!notif.IsRead ? "bg-blue-50/50" : "")">
+                                    <div class="flex gap-3">
+                                        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center @GetNotifIconBg(notif.Type)">
+                                            @if (notif.Type == "Order")
+                                            {
+                                                <svg class="w-4 h-4 @GetNotifIconColor(notif.Type)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                                </svg>
+                                            }
+                                            else if (notif.Type == "Ticket")
+                                            {
+                                                <svg class="w-4 h-4 @GetNotifIconColor(notif.Type)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+                                                </svg>
+                                            }
+                                            else
+                                            {
+                                                <svg class="w-4 h-4 @GetNotifIconColor(notif.Type)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            }
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-gray-900 truncate">@notif.Title</p>
+                                            <p class="text-xs text-gray-500 truncate">@notif.Message</p>
+                                            <p class="text-[10px] text-gray-400 mt-1">@GetTimeAgo(notif.CreatedAt)</p>
+                                        </div>
+                                        @if (!notif.IsRead)
+                                        {
+                                            <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="px-4 py-8 text-center">
+                                <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
+                                <p class="text-sm text-gray-400">No notifications yet</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="min-h-screen bg-white py-6">
+                <div class="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10">
+                    @Body
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private User? CurrentUser;
+    private bool showNotifications = false;
+    private bool mobileMenuOpen = false;
+    private List<CustomerNotification> notifications = new();
+    private int unreadNotificationCount = 0;
+    private ModuleAccessConfig? moduleAccessConfig;
+    private TenantSubscriptionModel? tenantSubscription;
+    private string currentBranchLabel = "Branch: Unassigned";
+
+    public class CustomerNotification
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public string Message { get; set; } = "";
+        public string Type { get; set; } = "Info";
+        public bool IsRead { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadModuleVisibilityPolicyAsync();
+        CurrentUser = await ApiClient.GetCurrentUserAsync();
+        if (CurrentUser != null)
+        {
+            currentBranchLabel = await ResolveBranchLabelAsync(CurrentUser);
+            await LoadNotifications();
+        }
+    }
+
+    private async Task<string> ResolveBranchLabelAsync(User? user)
+    {
+        if (user is null || user.BranchId is null || user.BranchId <= 0)
+        {
+            return "Branch: Unassigned";
+        }
+
+        var branchName = string.IsNullOrWhiteSpace(user.BranchName) ? null : user.BranchName.Trim();
+        if (branchName is null)
+        {
+            try
+            {
+                var users = await ApiClient.GetUsersAsync();
+                branchName = users?.FirstOrDefault(u => u.Id == user.Id)?.BranchName?.Trim();
+            }
+            catch
+            {
+            }
+        }
+
+        if (branchName is null)
+        {
+            try
+            {
+                var branches = await ApiClient.GetBranchesAsync();
+                branchName = branches?.FirstOrDefault(b => b.Id == user.BranchId.Value)?.Name?.Trim();
+            }
+            catch
+            {
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(branchName) ? "Branch: Unassigned" : $"Branch: {branchName}";
+    }
+
+    private async Task LoadNotifications()
+    {
+        var notifList = new List<CustomerNotification>();
+
+        try
+        {
+            var customer = await ApiClient.GetCustomerByUserIdAsync(CurrentUser!.Id);
+            if (customer != null)
+            {
+                // Load order-based notifications
+                var orders = await ApiClient.GetOrdersByCustomerAsync(customer.Id);
+                if (orders != null)
+                {
+                    foreach (var order in orders.OrderByDescending(o => o.OrderDate).Take(5))
+                    {
+                        var statusMessage = order.Status switch
+                        {
+                            "Pending" => "Your order is being processed",
+                            "Processing" => "Your order is being prepared",
+                            "Shipped" => "Your order has been shipped!",
+                            "Delivered" => "Your order has been delivered",
+                            "Cancelled" => "Your order has been cancelled",
+                            _ => $"Order status: {order.Status}"
+                        };
+
+                        notifList.Add(new CustomerNotification
+                        {
+                            Id = order.Id,
+                            Title = $"Order #{order.OrderNumber}",
+                            Message = $"{statusMessage} - P{order.TotalAmount:N2}",
+                            Type = "Order",
+                            IsRead = order.Status == "Delivered" || order.Status == "Cancelled",
+                            CreatedAt = order.OrderDate
+                        });
+                    }
+                }
+
+                // Load ticket-based notifications
+                var tickets = await ApiClient.GetTicketsByCustomerAsync(customer.Id);
+                if (tickets != null)
+                {
+                    foreach (var ticket in tickets.OrderByDescending(t => t.UpdatedAt ?? t.CreatedAt).Take(5))
+                    {
+                        var ticketMessage = ticket.Status switch
+                        {
+                            "Open" => "Your ticket has been submitted",
+                            "InProgress" => "An agent is working on your ticket",
+                            "PendingCustomer" => "Agent is waiting for your response",
+                            "Resolved" => "Your ticket has been resolved",
+                            "Closed" => "Your ticket has been closed",
+                            _ => $"Ticket status: {ticket.Status}"
+                        };
+
+                        notifList.Add(new CustomerNotification
+                        {
+                            Id = ticket.Id + 10000,
+                            Title = $"Ticket #{ticket.TicketNumber}",
+                            Message = $"{ticketMessage}: {ticket.Title}",
+                            Type = "Ticket",
+                            IsRead = ticket.Status == "Closed" || ticket.Status == "Resolved",
+                            CreatedAt = ticket.UpdatedAt ?? ticket.CreatedAt
+                        });
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading notifications: {ex.Message}");
+        }
+
+        notifications = notifList.OrderByDescending(n => n.CreatedAt).ToList();
+        unreadNotificationCount = notifications.Count(n => !n.IsRead);
+    }
+
+    private void ToggleNotifications()
+    {
+        showNotifications = !showNotifications;
+    }
+
+    private void ToggleMobileMenu()
+    {
+        mobileMenuOpen = !mobileMenuOpen;
+    }
+
+    private void MarkAllAsRead()
+    {
+        foreach (var n in notifications)
+        {
+            n.IsRead = true;
+        }
+        unreadNotificationCount = 0;
+    }
+
+    private string GetNotifIconBg(string type) => type switch
+    {
+        "Order" => "bg-blue-100",
+        "Ticket" => "bg-orange-100",
+        _ => "bg-gray-100"
+    };
+
+    private string GetNotifIconColor(string type) => type switch
+    {
+        "Order" => "text-blue-600",
+        "Ticket" => "text-orange-600",
+        _ => "text-gray-600"
+    };
+
+    private string GetTimeAgo(DateTime date)
+    {
+        var diff = DateTime.Now - date;
+        if (diff.TotalMinutes < 1) return "Just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d ago";
+        return date.ToString("MMM dd");
+    }
+
+    private async Task Logout()
+    {
+        await ApiClient.LogoutAsync();
+        NavigationManager.NavigateTo("/");
+    }
+
+    private async Task LoadModuleVisibilityPolicyAsync()
+    {
+        try
+        {
+            moduleAccessConfig = await ApiClient.GetModuleAccessConfigAsync();
+            tenantSubscription = await ApiClient.GetMySubscriptionAsync();
+        }
+        catch
+        {
+            moduleAccessConfig = null;
+            tenantSubscription = null;
+        }
+    }
+
+    private bool IsModuleVisible(string moduleKey)
+    {
+        return ModuleVisibilityHelper.IsModuleVisible(
+            moduleKey,
+            UserRole.Customer,
+            moduleAccessConfig,
+            tenantSubscription);
+    }
+}

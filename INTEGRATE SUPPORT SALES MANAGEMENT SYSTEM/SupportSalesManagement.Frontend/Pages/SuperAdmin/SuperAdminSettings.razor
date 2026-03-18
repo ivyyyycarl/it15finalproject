@@ -1,0 +1,10 @@
+@page "/superadmin/system-settings"
+@layout SuperAdminLayout
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.NavigateTo("/superadmin/settings", replace: true);
+    }
+}

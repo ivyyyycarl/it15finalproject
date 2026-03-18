@@ -1,0 +1,453 @@
+@page "/supervisor/tickets"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor,Admin")]
+
+@using SupportSalesManagement.Frontend.Services
+@using SupportSalesManagement.Frontend.Models
+@using CustomerModel = SupportSalesManagement.Frontend.Models.Customer
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<PageTitle>Tickets - Nexus CRM</PageTitle>
+
+<div class="space-y-4 p-6 max-w-[1600px] mx-auto bg-[#F8FAFC] min-h-screen" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <!-- Header -->
+    <div class="page-local-header flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="page-title-block">
+            <h1 class="text-[22px] font-bold text-[#1E293B] tracking-tight">Tickets</h1>
+            <p class="text-gray-500 mt-1 text-[12px]">Manage and track customer support requests</p>
+        </div>
+        <div>
+            <button @onclick="NavigateToCreateTicket"
+                class="px-6 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-medium rounded-lg transition-all shadow-sm flex items-center gap-2">
+                Create Ticket
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+
+        <!-- Tabs -->
+        <div class="px-6 pt-4 border-b border-gray-100">
+            <div class="flex items-center gap-8">
+                <button @onclick='() => SetFilter("All")'
+                    class="pb-4 text-sm font-medium transition-colors relative @(activeFilter == "All" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")">
+                    All
+                    @if (activeFilter == "All")
+                    {
+                        <div
+                            class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>
+                    }
+                </button>
+                <button @onclick='() => SetFilter("Unassigned")'
+                    class="pb-4 text-sm font-medium transition-colors relative @(activeFilter == "Unassigned" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")">
+                    Unassigned
+                    @if (activeFilter == "Unassigned")
+                    {
+                        <div
+                            class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>
+                    }
+                </button>
+                <button @onclick='() => SetFilter("High Priority")'
+                    class="pb-4 text-sm font-medium transition-colors relative @(activeFilter == "High Priority" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")">
+                    High Priority
+                    @if (activeFilter == "High Priority")
+                    {
+                        <div
+                            class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>
+                    }
+                </button>
+                <button @onclick='() => SetFilter("Overdue")'
+                    class="pb-4 text-sm font-medium transition-colors relative @(activeFilter == "Overdue" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")">
+                    Overdue
+                    @if (activeFilter == "Overdue")
+                    {
+                        <div
+                            class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>
+                    }
+                </button>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="p-6 border-b border-gray-100">
+            <div class="flex items-center gap-4">
+                <div class="relative flex-1">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <input value="@searchInput" @oninput="OnSearchInput" type="text"
+                        class="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow"
+                        placeholder="Search tickets..." />
+                </div>
+                <button
+                    class="p-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-500 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead class="bg-white">
+                    <tr>
+                        <th scope="col"
+                            class="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                            TICKET ID
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                            SUBJECT
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                            CUSTOMER
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                            ASSIGNED TO
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                            PRIORITY
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                            STATUS
+                        </th>
+                        <th scope="col"
+                            class="px-6 py-4 text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                            ACTION
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50 bg-white">
+                    @if (isLoading)
+                    {
+                        <tr>
+                            <td colspan="7" class="px-6 py-12 text-center">
+                                <div class="flex justify-center">
+                                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    else if (!FilteredTickets().Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                                No tickets found matching your filters.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var ticket in PagedFilteredTickets)
+                        {
+                            <tr class="hover:bg-gray-50 transition-colors group border-b border-gray-50 last:border-b-0">
+                                <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-600">
+                                    @ticket.TicketNumber
+                                </td>
+                                <td class="px-6 py-5 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    @ticket.Title
+                                </td>
+                                <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-600">
+                                    @ticket.Customer?.FirstName @ticket.Customer?.LastName
+                                </td>
+                                <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-600">
+                                    @if (string.IsNullOrEmpty(ticket.AssignedTo))
+                                    {
+                                        <span>Unassigned</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@ticket.AssignedTo</span>
+                                    }
+                                </td>
+                                <td class="px-6 py-5 whitespace-nowrap">
+                                    <span
+                                        class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full @GetPriorityClass(ticket.Priority)">
+                                        @ticket.Priority
+                                    </span>
+                                </td>
+                                <td class="px-6 py-5 whitespace-nowrap">
+                                    <span
+                                        class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full @GetStatusClass(ticket.Status)">
+                                        @ticket.Status
+                                    </span>
+                                </td>
+                                <td class="px-6 py-5 whitespace-nowrap text-right text-sm">
+                                    <a href="/supervisor/tickets/@ticket.Id"
+                                        class="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        View
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="bg-white px-6 py-4 flex items-center justify-between border-t border-gray-100">
+            <div>
+                <p class="text-sm text-gray-500">
+                    Showing <span class="font-medium">@(((currentPage - 1) * pageSize) + 1)</span> to <span class="font-medium">@Math.Min(currentPage * pageSize,
+                        filteredTickets.Count)</span> of <span class="font-medium">@filteredTickets.Count</span>
+                    results
+                </p>
+            </div>
+            <div>
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button type="button" @onclick="PreviousPage" disabled="@(currentPage <= 1)"
+                        class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-200 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Previous</span>
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-200 bg-blue-600 text-sm font-medium text-white">
+                        @currentPage / @totalPages
+                    </span>
+                    <button type="button" @onclick="NextPage" disabled="@(currentPage >= totalPages)"
+                        class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-200 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                        <span class="sr-only">Next</span>
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "filter")]
+    public string? QueryFilter { get; set; }
+
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? QuerySearch { get; set; }
+
+    private List<Ticket> allTickets = new();
+    private bool isLoading = true;
+    private string activeFilter = "All";
+    private string searchTerm = "";
+    private string searchInput = "";
+    private List<Ticket> filteredTickets = new();
+    private int currentPage = 1;
+    private const int pageSize = 25;
+    private CancellationTokenSource? _searchDebounceCts;
+    private int totalPages => Math.Max(1, (int)Math.Ceiling(filteredTickets.Count / (double)pageSize));
+    private List<Ticket> PagedFilteredTickets => filteredTickets
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        ApplyDeepLinkFilters();
+    }
+
+    protected override void OnParametersSet()
+    {
+        ApplyDeepLinkFilters();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            allTickets = await ApiClient.GetTicketsAsync() ?? new List<Ticket>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading tickets: {ex.Message}");
+            allTickets = new List<Ticket>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private IEnumerable<Ticket> FilteredTickets()
+    {
+        var query = allTickets.AsEnumerable();
+
+        if (activeFilter == "Unassigned")
+            query = query.Where(t => string.IsNullOrEmpty(t.AssignedTo));
+        else if (activeFilter == "High Priority")
+            query = query.Where(t => t.Priority == "High" || t.Priority == "Urgent");
+        else if (activeFilter == "Overdue")
+            query = query.Where(t => t.CreatedAt < DateTime.Now.AddDays(-2));
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            query = query.Where(t =>
+            t.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            t.TicketNumber.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            (t.Customer?.FirstName + " " + t.Customer?.LastName).Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+            );
+        }
+
+        return query;
+    }
+
+    private void SetFilter(string filter)
+    {
+        activeFilter = filter;
+        RebuildFilteredTickets();
+        SyncUrlState();
+    }
+
+    private void ApplyDeepLinkFilters()
+    {
+        if (!string.IsNullOrWhiteSpace(QueryFilter))
+        {
+            var normalizedFilter = QueryFilter.Trim().ToLowerInvariant();
+            activeFilter = normalizedFilter switch
+            {
+                "all" => "All",
+                "unassigned" => "Unassigned",
+                "high" or "highpriority" or "high-priority" => "High Priority",
+                "overdue" => "Overdue",
+                _ => activeFilter
+            };
+        }
+
+        if (QuerySearch is not null)
+        {
+            searchInput = QuerySearch;
+            searchTerm = QuerySearch;
+        }
+
+        RebuildFilteredTickets();
+    }
+
+    private void RebuildFilteredTickets()
+    {
+        filteredTickets = FilteredTickets().ToList();
+        currentPage = 1;
+    }
+
+    private static string ToFilterQueryValue(string filter) => filter switch
+    {
+        "All" => "all",
+        "Unassigned" => "unassigned",
+        "High Priority" => "high-priority",
+        "Overdue" => "overdue",
+        _ => "all"
+    };
+
+    private void SyncUrlState()
+    {
+        var queryParts = new List<string>();
+        queryParts.Add($"filter={Uri.EscapeDataString(ToFilterQueryValue(activeFilter))}");
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            queryParts.Add($"q={Uri.EscapeDataString(searchTerm)}");
+        }
+
+        var target = queryParts.Count > 0
+            ? $"/supervisor/tickets?{string.Join("&", queryParts)}"
+            : "/supervisor/tickets";
+
+        NavigationManager.NavigateTo(target, replace: true);
+    }
+
+    private void NavigateToCreateTicket()
+    {
+        NavigationManager.NavigateTo("/supervisor/tickets/create");
+    }
+
+    // --- Helpers ---
+
+    private string GetPriorityClass(string priority)
+    {
+        return priority switch
+        {
+            "High" or "Urgent" => "bg-red-100 text-red-700",
+            "Medium" => "bg-yellow-100 text-yellow-800",
+            "Low" or "Normal" => "bg-blue-100 text-blue-700",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status switch
+        {
+            "Open" => "bg-blue-100 text-blue-700",
+            "In Progress" => "bg-purple-100 text-purple-700",
+            "Pending" => "bg-gray-100 text-gray-700",
+            "Resolved" or "Closed" => "bg-green-100 text-green-700",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchInput = e.Value?.ToString() ?? string.Empty;
+        await DebouncedApplySearchAsync();
+    }
+
+    private async Task DebouncedApplySearchAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (token.IsCancellationRequested) return;
+            searchTerm = searchInput;
+            RebuildFilteredTickets();
+            SyncUrlState();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage >= totalPages) return;
+        currentPage++;
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+    }
+
+}

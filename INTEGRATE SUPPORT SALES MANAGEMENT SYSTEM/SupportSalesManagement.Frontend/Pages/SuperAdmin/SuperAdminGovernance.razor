@@ -1,0 +1,670 @@
+@page "/superadmin/governance"
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject ApiClient ApiClient
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Subscription & Branching - Super Admin</PageTitle>
+
+<div class="max-w-[1240px] mx-auto space-y-3">
+    <div class="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-blue-50 to-cyan-50 p-3.5 shadow-sm">
+        <h1 class="text-2xl font-bold text-gray-900">Subscription & Branching</h1>
+        <p class="text-sm text-gray-600 mt-1">Manage subscription plans, current plan assignment, branch limits, and user branch ownership.</p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="rounded-lg border px-3 py-2 text-sm @(statusSuccess ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700")">
+            @statusMessage
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        </div>
+    }
+    else
+    {
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50 p-3 shadow-sm ui-stat-card governance-stat-card">
+                <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Branches</p>
+                <p class="mt-1.5 text-xl font-extrabold text-gray-900">@branches.Count</p>
+                <p class="text-xs text-gray-600 mt-1">Limit: @(currentSubscription?.MaxBranches ?? 0)</p>
+            </div>
+            <div class="rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 shadow-sm ui-stat-card governance-stat-card">
+                <p class="text-xs font-semibold uppercase tracking-wide text-violet-700">Users Assigned</p>
+                <p class="mt-1.5 text-xl font-extrabold text-gray-900">@AssignedUsersCount</p>
+                <p class="text-xs text-gray-600 mt-1">Unassigned: @UnassignedUsersCount</p>
+            </div>
+            <div class="rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50 p-3 shadow-sm ui-stat-card governance-stat-card">
+                <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Subscription Status</p>
+                <p class="mt-1.5 text-xl font-extrabold text-gray-900">@(currentSubscription?.Status.ToString() ?? "N/A")</p>
+                <p class="text-xs text-gray-600 mt-1">Auto-renew: @(currentSubscription?.AutoRenew == true ? "Enabled" : "Disabled")</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden ui-surface-card">
+            <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-amber-50/50">
+                <div>
+                    <h2 class="text-base font-bold text-gray-900">Module Disable Notification History</h2>
+                    <p class="text-xs text-gray-500">Email notifications sent when Super Admin disables modules by role.</p>
+                </div>
+                <span class="text-xs text-gray-500">@moduleDisableNotifications.Count sent</span>
+            </div>
+            <div class="max-h-[220px] overflow-auto">
+                @if (moduleDisableNotifications.Count == 0)
+                {
+                    <div class="px-5 py-6 text-sm text-gray-500">No module-disable notifications found yet.</div>
+                }
+                else
+                {
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 text-gray-600 uppercase text-xs tracking-wider">
+                            <tr>
+                                <th class="text-left px-4 py-3">Timestamp</th>
+                                <th class="text-left px-4 py-3">Triggered By</th>
+                                <th class="text-left px-4 py-3">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach (var log in moduleDisableNotifications.Take(20))
+                            {
+                                <tr>
+                                    <td class="px-4 py-3 text-gray-700">@log.Timestamp.ToLocalTime().ToString("MMM d, yyyy hh:mm tt")</td>
+                                    <td class="px-4 py-3 text-gray-700">@log.UserEmail</td>
+                                    <td class="px-4 py-3 text-gray-600">@log.Description</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div class="md:col-span-7 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden ui-surface-card">
+                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-blue-50/60">
+                    <h2 class="text-base font-bold text-gray-900">Subscription Plans</h2>
+                    <span class="text-xs text-gray-500">@plans.Count available</span>
+                </div>
+                <div class="max-h-[300px] overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 text-gray-600 uppercase text-[11px] tracking-wider">
+                            <tr>
+                                <th class="text-left px-3 py-2">Plan</th>
+                                <th class="text-right px-3 py-2">Monthly</th>
+                                <th class="text-right px-3 py-2">Annual</th>
+                                <th class="text-right px-3 py-2">Users</th>
+                                <th class="text-right px-3 py-2">Branches</th>
+                                <th class="text-left px-3 py-2">Included Modules</th>
+                                <th class="text-left px-3 py-2">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach (var plan in plans)
+                            {
+                                var isCurrentPlan = currentSubscription?.SubscriptionPlanId == plan.Id;
+                                var includedModules = GetIncludedModules(plan);
+                                <tr class="hover:bg-blue-50/40 transition-colors">
+                                    <td class="px-3 py-2">
+                                        <div class="flex items-center gap-2">
+                                            <div class="font-semibold text-gray-900">@plan.Name</div>
+                                            @if (isCurrentPlan)
+                                            {
+                                                <span class="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">CURRENT</span>
+                                            }
+                                        </div>
+                                        <div class="text-xs text-gray-500">@plan.Code</div>
+                                    </td>
+                                    <td class="px-3 py-2 text-right">₱@plan.MonthlyPrice.ToString("N2")</td>
+                                    <td class="px-3 py-2 text-right">₱@plan.AnnualPrice.ToString("N2")</td>
+                                    <td class="px-3 py-2 text-right">@plan.MaxUsers</td>
+                                    <td class="px-3 py-2 text-right">@plan.MaxBranches</td>
+                                    <td class="px-3 py-2">
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach (var token in includedModules.Take(5))
+                                            {
+                                                <span class="inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">@token</span>
+                                            }
+                                            @if (includedModules.Count > 5)
+                                            {
+                                                <span class="inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">+@(includedModules.Count - 5) more</span>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <span class="inline-flex text-xs font-semibold px-2 py-1 rounded-full @(plan.IsActive ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-700")">
+                                            @(plan.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="md:col-span-5 md:max-w-[420px] md:justify-self-end w-full rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-blue-50 p-3 shadow-sm space-y-3 ui-surface-card">
+                <h3 class="text-sm font-bold text-gray-900">Current Subscription</h3>
+                @if (currentSubscription != null)
+                {
+                    <div class="text-sm text-gray-700 space-y-1.5 rounded-xl bg-white/70 border border-indigo-100 p-2.5">
+                        <p><span class="font-semibold">Plan:</span> @currentSubscription.PlanName (@currentSubscription.PlanCode)</p>
+                        <p><span class="font-semibold">Status:</span> @currentSubscription.Status</p>
+                        <p><span class="font-semibold">Max Users:</span> @currentSubscription.MaxUsers</p>
+                        <p><span class="font-semibold">Max Branches:</span> @currentSubscription.MaxBranches</p>
+                    </div>
+                }
+                <select @bind="selectedPlanId" @bind:after="OnSelectedPlanChangedAsync"
+                        class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    @foreach (var plan in plans.Where(p => p.IsActive))
+                    {
+                        <option value="@plan.Id">@plan.Name (@plan.Code)</option>
+                    }
+                </select>
+                <button type="button"
+                        @onclick="UpdateCurrentSubscription"
+                        class="w-full px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
+                    Apply Plan
+                </button>
+
+                <div class="pt-2 space-y-2.5">
+                    <div class="rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-3 shadow-sm ui-stat-card governance-stat-card">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-sky-700">Active Subscriptions</p>
+                        <p class="mt-1.5 text-xl font-extrabold text-gray-900">@governanceAnalytics?.ActiveSubscriptions</p>
+                    </div>
+                    <div class="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-3 shadow-sm ui-stat-card governance-stat-card">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">MRR Estimate</p>
+                        <p class="mt-1.5 text-xl font-extrabold text-gray-900">₱@((governanceAnalytics?.MonthlyRecurringRevenueEstimate ?? 0).ToString("N2"))</p>
+                    </div>
+                    <div class="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-sm ui-stat-card governance-stat-card">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Revenue This Month</p>
+                        <p class="mt-1.5 text-xl font-extrabold text-gray-900">₱@((governanceAnalytics?.RevenueCollectedCurrentPeriod ?? 0).ToString("N2"))</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div class="md:col-span-7 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden ui-surface-card">
+                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-violet-50/50">
+                    <div>
+                        <h2 class="text-base font-bold text-gray-900">Plan Module Entitlements</h2>
+                        <p class="text-xs text-gray-500">Configure module inclusion and per-role access by plan.</p>
+                    </div>
+                    <span class="text-xs text-gray-500">@selectedPlanModules.Count modules</span>
+                </div>
+                <div class="max-h-[300px] overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 text-gray-600 uppercase text-xs tracking-wider">
+                            <tr>
+                                <th class="text-left px-4 py-3">Module</th>
+                                <th class="text-center px-4 py-3">Included</th>
+                                <th class="text-center px-4 py-3">Admin</th>
+                                <th class="text-center px-4 py-3">Supervisor</th>
+                                <th class="text-center px-4 py-3">Agent</th>
+                                <th class="text-center px-4 py-3">Customer</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach (var module in selectedPlanModules)
+                            {
+                                <tr>
+                                    <td class="px-4 py-3">
+                                        <div class="font-semibold text-gray-900">@module.DisplayName</div>
+                                        <div class="text-xs text-gray-500">@module.Category · @module.ModuleKey</div>
+                                    </td>
+                                    <td class="px-4 py-3 text-center"><input type="checkbox" @bind="module.IsIncluded" /></td>
+                                    <td class="px-4 py-3 text-center"><input type="checkbox" @bind="module.AllowAdmin" /></td>
+                                    <td class="px-4 py-3 text-center"><input type="checkbox" @bind="module.AllowSupervisor" /></td>
+                                    <td class="px-4 py-3 text-center"><input type="checkbox" @bind="module.AllowAgent" /></td>
+                                    <td class="px-4 py-3 text-center"><input type="checkbox" @bind="module.AllowCustomer" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-4 py-3 border-t border-gray-100 bg-gray-50 text-right">
+                    <button type="button"
+                            @onclick="SavePlanModulesAsync"
+                            class="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700">
+                        Save Plan Module Matrix
+                    </button>
+                </div>
+            </div>
+
+            <div class="md:col-span-5 md:max-w-[420px] md:justify-self-end w-full rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-cyan-50 p-3 shadow-sm space-y-2.5 ui-surface-card">
+                <h3 class="text-sm font-bold text-gray-900">Governance Analytics</h3>
+                <p class="text-xs text-gray-600">Current period adoption, usage, and revenue indicators.</p>
+                <div class="rounded-xl bg-white border border-blue-100 p-2.5 text-sm space-y-1">
+                    <p><span class="font-semibold">Active Subscriptions:</span> @governanceAnalytics?.ActiveSubscriptions</p>
+                    <p><span class="font-semibold">MRR Estimate:</span> ₱@(governanceAnalytics?.MonthlyRecurringRevenueEstimate.ToString("N2") ?? "0.00")</p>
+                    <p><span class="font-semibold">Collected This Month:</span> ₱@(governanceAnalytics?.RevenueCollectedCurrentPeriod.ToString("N2") ?? "0.00")</p>
+                </div>
+                @if (governanceAnalytics?.PlanAdoption?.Any() == true)
+                {
+                    <div class="rounded-xl bg-white border border-blue-100 p-2.5">
+                        <p class="text-xs font-semibold text-gray-600 uppercase mb-2">Plan Adoption</p>
+                        @foreach (var p in governanceAnalytics.PlanAdoption.Take(5))
+                        {
+                            <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100 last:border-b-0">
+                                <span>@p.PlanCode</span>
+                                <span class="font-semibold">@p.TenantCount</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div class="md:col-span-7 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden ui-surface-card">
+                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-emerald-50/50">
+                    <h2 class="text-base font-bold text-gray-900">Branches</h2>
+                    <span class="text-xs text-gray-500">@branches.Count total branches</span>
+                </div>
+                <div class="max-h-[300px] overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 text-gray-600 uppercase text-xs tracking-wider">
+                            <tr>
+                                <th class="text-left px-4 py-3">Branch</th>
+                                <th class="text-left px-4 py-3">Location</th>
+                                <th class="text-right px-4 py-3">Users</th>
+                                <th class="text-left px-4 py-3">Status</th>
+                                <th class="text-right px-4 py-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach (var branch in branches)
+                            {
+                                <tr class="hover:bg-emerald-50/40 transition-colors">
+                                    <td class="px-4 py-3">
+                                        <div class="font-semibold text-gray-900">@branch.Name</div>
+                                        <div class="text-xs text-gray-500">@branch.Code</div>
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-600">@BuildLocation(branch)</td>
+                                    <td class="px-4 py-3 text-right">@branch.AssignedUsersCount</td>
+                                    <td class="px-4 py-3">
+                                        <span class="inline-flex text-xs font-semibold px-2 py-1 rounded-full @(branch.IsActive ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-700")">
+                                            @(branch.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        @if (branch.IsActive)
+                                        {
+                                            <button class="text-red-600 hover:text-red-700 text-xs font-semibold"
+                                                    @onclick="() => DeactivateBranch(branch.Id)">
+                                                Deactivate
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="md:col-span-5 md:max-w-[420px] md:justify-self-end w-full rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50 p-3 shadow-sm space-y-2.5 ui-surface-card">
+                <h3 class="text-sm font-bold text-gray-900">Create Branch</h3>
+                <input @bind="branchForm.Name" type="text" placeholder="Branch name"
+                       class="w-full px-3 py-2 border border-emerald-200 bg-white rounded-lg text-sm" />
+                <input @bind="branchForm.Code" type="text" placeholder="Code (e.g. MNL-01)"
+                       class="w-full px-3 py-2 border border-emerald-200 bg-white rounded-lg text-sm" />
+                <input @bind="branchForm.City" type="text" placeholder="City"
+                       class="w-full px-3 py-2 border border-emerald-200 bg-white rounded-lg text-sm" />
+                <input @bind="branchForm.Province" type="text" placeholder="Province"
+                       class="w-full px-3 py-2 border border-emerald-200 bg-white rounded-lg text-sm" />
+                <button type="button"
+                        @onclick="CreateBranch"
+                        class="w-full px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+                    Save Branch
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div class="md:col-span-7 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden ui-surface-card">
+                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-violet-50/50">
+                    <h2 class="text-base font-bold text-gray-900">User Branch Assignment</h2>
+                    <span class="text-xs text-gray-500">@branchAssignableUsers.Count users</span>
+                </div>
+                <div class="max-h-[300px] overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 text-gray-600 uppercase text-xs tracking-wider">
+                            <tr>
+                                <th class="text-left px-4 py-3">User</th>
+                                <th class="text-left px-4 py-3">Role</th>
+                                <th class="text-left px-4 py-3">Current Branch</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach (var u in branchAssignableUsers.Take(12))
+                            {
+                                <tr class="hover:bg-violet-50/40 transition-colors">
+                                    <td class="px-4 py-3">
+                                        <div class="font-semibold text-gray-900">@u.Name</div>
+                                        <div class="text-xs text-gray-500">@u.Email</div>
+                                    </td>
+                                    <td class="px-4 py-3">@u.Role</td>
+                                    <td class="px-4 py-3">
+                                        <span class="inline-flex text-xs font-semibold px-2 py-1 rounded-full @(string.IsNullOrWhiteSpace(u.BranchName) ? "bg-amber-100 text-amber-700" : "bg-violet-100 text-violet-700")">
+                                            @(string.IsNullOrWhiteSpace(u.BranchName) ? "Unassigned" : u.BranchName)
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="md:col-span-5 md:max-w-[420px] md:justify-self-end w-full rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 shadow-sm space-y-2.5 ui-surface-card">
+                <h3 class="text-sm font-bold text-gray-900">Assign User to Branch</h3>
+                <select @bind="selectedUserId"
+                        class="w-full px-3 py-2 border border-violet-200 bg-white rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500">
+                    <option value="0">Select user</option>
+                    @foreach (var user in branchAssignableUsers)
+                    {
+                        <option value="@user.Id">@user.Name (@user.Role)</option>
+                    }
+                </select>
+                <select @bind="selectedBranchId"
+                        class="w-full px-3 py-2 border border-violet-200 bg-white rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500">
+                    <option value="">No branch (unassign)</option>
+                    @foreach (var branch in branches.Where(b => b.IsActive))
+                    {
+                        <option value="@branch.Id">@branch.Name</option>
+                    }
+                </select>
+                <button type="button"
+                        @onclick="AssignBranchToUser"
+                        class="w-full px-3 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700">
+                    Save Assignment
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .governance-stat-card {
+        min-height: 96px !important;
+    }
+</style>
+
+@code {
+    private bool isLoading = true;
+    private List<SubscriptionPlanModel> plans = new();
+    private TenantSubscriptionModel? currentSubscription;
+    private List<BranchModel> branches = new();
+    private List<User> branchAssignableUsers = new();
+    private int selectedPlanId;
+    private UpsertBranchRequest branchForm = new();
+    private int selectedUserId;
+    private string? selectedBranchId;
+    private string? statusMessage;
+    private bool statusSuccess;
+    private List<PlanModuleEntitlementModel> selectedPlanModules = new();
+    private SuperAdminGovernanceAnalyticsModel? governanceAnalytics;
+    private List<AuditLog> moduleDisableNotifications = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        plans = await ApiClient.GetSubscriptionPlansAsync() ?? new();
+        currentSubscription = await ApiClient.GetCurrentSubscriptionAsync();
+        branches = await ApiClient.GetBranchesAsync() ?? new();
+        branchAssignableUsers = (await ApiClient.GetSuperAdminUsersAsync() ?? new())
+            .Where(u => u.Role != UserRole.SuperAdmin)
+            .OrderBy(u => u.FirstName)
+            .ThenBy(u => u.LastName)
+            .ToList();
+        selectedPlanId = currentSubscription?.SubscriptionPlanId ?? plans.FirstOrDefault()?.Id ?? 0;
+        await LoadPlanModulesAsync();
+        governanceAnalytics = await ApiClient.GetGovernanceAnalyticsOverviewAsync();
+        var auditLogs = await ApiClient.GetAuditLogsAsync() ?? new();
+        moduleDisableNotifications = auditLogs
+            .Where(l => string.Equals(l.Action, "Module Access Notification Sent", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(l => l.Timestamp)
+            .ToList();
+        isLoading = false;
+    }
+
+    private async Task OnSelectedPlanChangedAsync()
+    {
+        await LoadPlanModulesAsync();
+    }
+
+    private async Task LoadPlanModulesAsync()
+    {
+        if (selectedPlanId <= 0)
+        {
+            selectedPlanModules = new();
+            return;
+        }
+
+        selectedPlanModules = await ApiClient.GetPlanModuleEntitlementsAsync(selectedPlanId) ?? new();
+    }
+
+    private async Task UpdateCurrentSubscription()
+    {
+        if (selectedPlanId <= 0) return;
+        var selectedPlan = plans.FirstOrDefault(p => p.Id == selectedPlanId);
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Apply plan '{selectedPlan?.Name ?? "Selected Plan"}' to the current tenant subscription?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var request = new UpdateTenantSubscriptionRequest
+        {
+            SubscriptionPlanId = selectedPlanId,
+            Status = SubscriptionStatus.Active,
+            AutoRenew = true
+        };
+
+        var updated = await ApiClient.UpdateCurrentSubscriptionAsync(request);
+        if (updated != null)
+        {
+            statusSuccess = true;
+            statusMessage = "Current subscription updated.";
+            currentSubscription = updated;
+        }
+        else
+        {
+            statusSuccess = false;
+            statusMessage = "Failed to update current subscription.";
+        }
+    }
+
+    private async Task SavePlanModulesAsync()
+    {
+        if (selectedPlanId <= 0 || selectedPlanModules.Count == 0)
+        {
+            statusSuccess = false;
+            statusMessage = "No plan modules available to save.";
+            return;
+        }
+
+        var selectedPlan = plans.FirstOrDefault(p => p.Id == selectedPlanId);
+        var confirmed = await JSRuntime.InvokeAsync<bool>(
+            "confirm",
+            $"Save module entitlements for '{selectedPlan?.Name ?? "selected plan"}'?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var updated = await ApiClient.UpdatePlanModuleEntitlementsAsync(selectedPlanId, new UpdatePlanModuleEntitlementsRequest
+        {
+            Modules = selectedPlanModules
+        });
+
+        if (updated != null)
+        {
+            selectedPlanModules = updated;
+            governanceAnalytics = await ApiClient.GetGovernanceAnalyticsOverviewAsync();
+            statusSuccess = true;
+            statusMessage = "Plan module entitlements updated.";
+        }
+        else
+        {
+            statusSuccess = false;
+            statusMessage = "Failed to update plan module entitlements.";
+        }
+    }
+
+    private async Task CreateBranch()
+    {
+        if (string.IsNullOrWhiteSpace(branchForm.Name) || string.IsNullOrWhiteSpace(branchForm.Code))
+        {
+            statusSuccess = false;
+            statusMessage = "Branch name and code are required.";
+            return;
+        }
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Create branch '{branchForm.Name}' ({branchForm.Code})?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var created = await ApiClient.CreateBranchAsync(branchForm);
+        if (created != null)
+        {
+            statusSuccess = true;
+            statusMessage = "Branch created successfully.";
+            branchForm = new UpsertBranchRequest();
+            branches = await ApiClient.GetBranchesAsync() ?? new();
+            branchAssignableUsers = (await ApiClient.GetSuperAdminUsersAsync() ?? new())
+                .Where(u => u.Role != UserRole.SuperAdmin)
+                .OrderBy(u => u.FirstName)
+                .ThenBy(u => u.LastName)
+                .ToList();
+        }
+        else
+        {
+            statusSuccess = false;
+            statusMessage = "Failed to create branch. Check subscription branch limit or duplicate code.";
+        }
+    }
+
+    private async Task DeactivateBranch(int branchId)
+    {
+        var branch = branches.FirstOrDefault(b => b.Id == branchId);
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Deactivate branch '{branch?.Name ?? $"#{branchId}"}'? Users in this branch may lose assignment scope.");
+        if (!confirmed)
+        {
+            return;
+        }
+        var ok = await ApiClient.DeactivateBranchAsync(branchId);
+        if (ok)
+        {
+            statusSuccess = true;
+            statusMessage = "Branch deactivated.";
+            branches = await ApiClient.GetBranchesAsync() ?? new();
+            branchAssignableUsers = (await ApiClient.GetSuperAdminUsersAsync() ?? new())
+                .Where(u => u.Role != UserRole.SuperAdmin)
+                .OrderBy(u => u.FirstName)
+                .ThenBy(u => u.LastName)
+                .ToList();
+        }
+        else
+        {
+            statusSuccess = false;
+            statusMessage = "Failed to deactivate branch.";
+        }
+    }
+
+    private static string BuildLocation(BranchModel branch)
+    {
+        var parts = new[] { branch.City, branch.Province, branch.Country }
+            .Where(x => !string.IsNullOrWhiteSpace(x));
+        return parts.Any() ? string.Join(", ", parts) : "—";
+    }
+
+    private int AssignedUsersCount => branchAssignableUsers.Count(u => !string.IsNullOrWhiteSpace(u.BranchName));
+    private int UnassignedUsersCount => branchAssignableUsers.Count - AssignedUsersCount;
+
+    private async Task AssignBranchToUser()
+    {
+        if (selectedUserId <= 0)
+        {
+            statusSuccess = false;
+            statusMessage = "Please select a user.";
+            return;
+        }
+
+        int? branchId = null;
+        if (!string.IsNullOrWhiteSpace(selectedBranchId) && int.TryParse(selectedBranchId, out var parsedBranchId))
+        {
+            branchId = parsedBranchId;
+        }
+        var selectedUser = branchAssignableUsers.FirstOrDefault(u => u.Id == selectedUserId);
+        var selectedBranchName = branchId.HasValue
+            ? branches.FirstOrDefault(b => b.Id == branchId.Value)?.Name ?? $"Branch #{branchId.Value}"
+            : "No branch";
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Assign '{selectedUser?.Name ?? $"User #{selectedUserId}"}' to '{selectedBranchName}'?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var ok = await ApiClient.AssignUserBranchAsync(selectedUserId, branchId);
+        if (ok)
+        {
+            statusSuccess = true;
+            statusMessage = "User branch assignment updated.";
+            branchAssignableUsers = (await ApiClient.GetSuperAdminUsersAsync() ?? new())
+                .Where(u => u.Role != UserRole.SuperAdmin)
+                .OrderBy(u => u.FirstName)
+                .ThenBy(u => u.LastName)
+                .ToList();
+        }
+        else
+        {
+            statusSuccess = false;
+            statusMessage = "Failed to update user branch assignment.";
+        }
+    }
+
+    private static List<string> GetIncludedModules(SubscriptionPlanModel plan)
+    {
+        if (string.IsNullOrWhiteSpace(plan.IncludedModulesCsv))
+        {
+            return new List<string> { "No modules configured" };
+        }
+
+        return plan.IncludedModulesCsv
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(FormatModuleToken)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string FormatModuleToken(string token)
+    {
+        var cleaned = token.Replace("-", " ").Replace("_", " ").Trim();
+        if (string.IsNullOrWhiteSpace(cleaned))
+        {
+            return "Module";
+        }
+
+        return string.Join(" ",
+            cleaned
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
+    }
+}

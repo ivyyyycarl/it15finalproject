@@ -1,0 +1,474 @@
+@page "/agent/notifications"
+@layout AgentLayout
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<PageTitle>Notifications | Agent Workspace</PageTitle>
+
+<div class="h-[calc(100vh-theme(spacing.16))] flex flex-col bg-gray-50" style="font-family: 'Inter', sans-serif; font-size: 12px;">
+    <!-- Header -->
+    <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm">
+        <div>
+            <h1 class="text-[21px] font-bold text-gray-900">
+                Notifications @(UnreadCount > 0 ? $"({UnreadCount} unread)" : "")
+            </h1>
+            <p class="text-[12px] text-gray-500 font-medium">
+                @if (LastRefreshed.HasValue)
+                {
+                    <span>Last refreshed: @GetTimeAgo(LastRefreshed.Value)</span>
+                }
+                else
+                {
+                    <span>Stay updated with system alerts and activities</span>
+                }
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <button @onclick="MarkAllRead" class="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline px-3 py-2 transition-colors">
+                Mark all as read
+            </button>
+            <div class="flex bg-gray-100 p-1 rounded-xl">
+                <button @onclick='() => SetFilter("All")' 
+                    class="px-4 py-2 rounded-lg text-sm font-bold transition-all @(Filter == "All" ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-900")">
+                    All
+                </button>
+                <button @onclick='() => SetFilter("Unread")'
+                    class="px-4 py-2 rounded-lg text-sm font-bold transition-all @(Filter == "Unread" ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-900")">
+                    Unread
+                </button>
+                <button @onclick='() => SetFilter("Critical")'
+                    class="px-4 py-2 rounded-lg text-sm font-bold transition-all @(Filter == "Critical" ? "bg-white text-red-600 shadow-md" : "text-gray-500 hover:text-gray-900")">
+                    Critical
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification List -->
+    <div class="flex-1 overflow-y-auto p-6 scrollbar-hide">
+        <div class="w-full max-w-6xl mx-auto space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
+                    <p class="text-[11px] font-bold uppercase tracking-widest text-blue-500 mb-1">Total</p>
+                    <p class="text-2xl font-black text-gray-900">@Notifications.Count</p>
+                </div>
+                <div class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
+                    <p class="text-[11px] font-bold uppercase tracking-widest text-emerald-600 mb-1">Unread</p>
+                    <p class="text-2xl font-black text-emerald-600">@UnreadCount</p>
+                </div>
+                <div class="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
+                    <p class="text-[11px] font-bold uppercase tracking-widest text-violet-600 mb-1">Ticket Alerts</p>
+                    <p class="text-2xl font-black text-violet-600">@Notifications.Count(n => n.Type == "Ticket")</p>
+                </div>
+                <div class="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
+                    <p class="text-[11px] font-bold uppercase tracking-widest text-rose-600 mb-1">Critical</p>
+                    <p class="text-2xl font-black text-rose-600">@Notifications.Count(n => n.Priority == "Critical")</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-gray-100 p-2 shadow-sm">
+                <div class="relative">
+                    <input type="text"
+                           @bind="SearchQuery"
+                           @bind:event="oninput"
+                           @bind:after="OnSearchChanged"
+                           placeholder="Search notifications..."
+                           class="w-full pl-11 pr-4 py-3 bg-gray-50/50 border-none rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all text-sm font-medium text-gray-900 placeholder-gray-400" />
+                    <svg class="w-5 h-5 text-gray-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="flex flex-col items-center justify-center py-24">
+                    <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+                        <svg class="w-8 h-8 text-blue-500 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900">Updating notifications...</h3>
+                </div>
+            }
+            else if (!FilteredNotifications.Any())
+            {
+                <div class="flex flex-col items-center justify-center py-24">
+                    <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                    </div>
+                    <h3 class="text-xl font-black text-gray-900 mb-2">You're all caught up!</h3>
+                    <p class="text-gray-500 font-medium">No new notifications at the moment.</p>
+                </div>
+            }
+            else
+            {
+                <div class="space-y-3">
+                @foreach (var note in PagedFilteredNotifications)
+                {
+                    <div class="@GetCardClass(note) rounded-2xl p-5 shadow-sm border border-gray-100 border-l-4 @GetBorderClass(note.Type) hover:shadow-md hover:border-blue-100 transition-all group overflow-hidden relative">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0">
+                                <div class="@GetIconClass(note.Type) w-11 h-11 rounded-xl flex items-center justify-center shadow-sm">
+                                    @if(note.Type == "Ticket") { <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> }
+                                    else if (note.Type == "Order") { <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg> }
+                                    else if (note.Type == "System") { <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> }
+                                    else { <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> }
+                                </div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex justify-between items-start mb-1">
+                                    <h3 class="font-bold text-gray-900 text-[15px] truncate">@note.Title</h3>
+                                    <span class="text-[11px] font-bold text-gray-400 whitespace-nowrap ml-4">@note.TimeAgo</span>
+                                </div>
+                                <p class="text-[13px] text-gray-600 font-medium leading-relaxed mb-3">@note.Message</p>
+                                <div class="flex items-center justify-between">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-bold uppercase tracking-wider @(note.Priority == "Critical" ? "bg-rose-50 text-rose-600 border border-rose-100" : note.Priority == "High" ? "bg-amber-50 text-amber-600 border border-amber-100" : "bg-gray-50 text-gray-600 border border-gray-100")">
+                                        <span class="w-1.5 h-1.5 rounded-full @(note.Priority == "Critical" ? "bg-rose-500" : note.Priority == "High" ? "bg-amber-500" : "bg-gray-400")"></span>
+                                        @note.Priority
+                                    </span>
+                                    
+                                    @if (!note.IsRead)
+                                    {
+                                        <button @onclick="() => MarkRead(note)" class="text-[11px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                                            Mark as read
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                            @if (!note.IsRead) { <div class="w-2.5 h-2.5 rounded-full bg-blue-500 mt-2 ring-4 ring-blue-50"></div> }
+                        </div>
+                    </div>
+                }
+                </div>
+            }
+            @if (!isLoading && FilteredNotificationsList.Any())
+            {
+                <div class="px-6 py-4 rounded-2xl border border-gray-100 bg-white flex items-center justify-between shadow-sm">
+                    <p class="text-[12px] text-gray-500 font-bold uppercase tracking-wider">
+                        Page <span class="text-gray-900">@currentPage</span> of <span class="text-gray-900">@TotalPages</span>
+                    </p>
+                    <div class="flex items-center gap-3">
+                        <button type="button" @onclick="PreviousPage" disabled="@(currentPage <= 1)"
+                                class="px-4 py-2 rounded-xl border border-gray-200 bg-white text-xs font-black text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 transition-all">PREV</button>
+                        <button type="button" @onclick="NextPage" disabled="@(currentPage >= TotalPages)"
+                                class="px-4 py-2 rounded-xl border border-gray-200 bg-white text-xs font-black text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 transition-all">NEXT</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string Filter = "All";
+    private List<Notification> Notifications = new();
+    private bool isLoading = true;
+    private DateTime? LastRefreshed;
+    private System.Threading.Timer? refreshTimer;
+    private int notificationIdCounter = 1;
+    private int currentPage = 1;
+    private const int pageSize = 15;
+    private string SearchQuery = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotificationsAsync();
+        
+        // Set up auto-refresh timer (30 seconds)
+        refreshTimer = new System.Threading.Timer(async _ => 
+        {
+            await InvokeAsync(async () =>
+            {
+                await RefreshNotificationsAsync();
+            });
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task LoadNotificationsAsync()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Load real data from API
+            var ordersTask = ApiClient.GetOrdersAsync();
+            var ticketsTask = ApiClient.GetTicketsAsync();
+            var productsTask = ApiClient.GetProductsAsync();
+
+            await Task.WhenAll(ordersTask, ticketsTask, productsTask);
+
+            var orders = await ordersTask ?? new List<Order>();
+            var tickets = await ticketsTask ?? new List<Ticket>();
+            var products = await productsTask ?? new List<Product>();
+
+            // Generate notifications from real data
+            var newNotifications = new List<Notification>();
+
+            // Pending orders -> "Order" type notifications
+            var pendingOrders = orders.Where(o => o.Status?.ToLower() == "pending" || o.Status?.ToLower() == "pendingpayment").ToList();
+            foreach (var order in pendingOrders)
+            {
+                newNotifications.Add(new Notification
+                {
+                    Id = notificationIdCounter++,
+                    Type = "Order",
+                    Title = $"Pending Order: {order.OrderNumber}",
+                    Message = $"Order {order.OrderNumber} from {order.CustomerName} requires attention. Status: {order.Status}",
+                    CreatedAt = order.CreatedAt,
+                    IsRead = false,
+                    Priority = "High"
+                });
+            }
+
+            // Open/assigned tickets -> "Ticket" type notifications
+            var openTickets = tickets.Where(t => 
+                (t.Status?.ToLower() == "open" || t.Status?.ToLower() == "inprogress") && 
+                t.AssignedAgentId.HasValue).ToList();
+            foreach (var ticket in openTickets)
+            {
+                newNotifications.Add(new Notification
+                {
+                    Id = notificationIdCounter++,
+                    Type = "Ticket",
+                    Title = $"Open Ticket: {ticket.TicketNumber}",
+                    Message = $"Ticket {ticket.TicketNumber} - {ticket.Title} is currently open and assigned.",
+                    CreatedAt = ticket.CreatedAt,
+                    IsRead = false,
+                    Priority = "Medium"
+                });
+            }
+
+            // Low stock products (StockQuantity <= 10) -> "System" type notifications
+            var lowStockProducts = products.Where(p => p.StockQuantity <= 10 && p.IsActive).ToList();
+            foreach (var product in lowStockProducts)
+            {
+                var priority = product.StockQuantity == 0 ? "Critical" : "High";
+                newNotifications.Add(new Notification
+                {
+                    Id = notificationIdCounter++,
+                    Type = "System",
+                    Title = product.StockQuantity == 0 ? $"Out of Stock: {product.Name}" : $"Low Stock Alert: {product.Name}",
+                    Message = product.StockQuantity == 0 
+                        ? $"Product {product.Name} (SKU: {product.SKU}) is out of stock."
+                        : $"Product {product.Name} (SKU: {product.SKU}) has only {product.StockQuantity} units remaining.",
+                    CreatedAt = product.CreatedAt,
+                    IsRead = false,
+                    Priority = priority
+                });
+            }
+
+            // Merge with existing notifications, preserving read status
+            var existingIds = Notifications.Select(n => n.Id).ToHashSet();
+            var mergedNotifications = Notifications.ToList();
+            
+            // Initialize counter based on existing notifications
+            if (existingIds.Any())
+            {
+                notificationIdCounter = existingIds.Max() + 1;
+            }
+            
+            foreach (var newNote in newNotifications)
+            {
+                // Check if similar notification already exists (by matching key parts of title)
+                var newNoteKey = newNote.Title.Split(':').FirstOrDefault()?.Trim() ?? "";
+                var existing = mergedNotifications.FirstOrDefault(n => 
+                    n.Type == newNote.Type && 
+                    n.Title.StartsWith(newNoteKey, StringComparison.OrdinalIgnoreCase));
+                
+                if (existing == null)
+                {
+                    // Ensure unique ID
+                    while (existingIds.Contains(notificationIdCounter))
+                    {
+                        notificationIdCounter++;
+                    }
+                    newNote.Id = notificationIdCounter++;
+                    existingIds.Add(newNote.Id);
+                    mergedNotifications.Add(newNote);
+                }
+            }
+
+            // Sort by CreatedAt descending (newest first)
+            Notifications = mergedNotifications.OrderByDescending(n => n.CreatedAt).ToList();
+            LastRefreshed = DateTime.UtcNow;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading notifications: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshNotificationsAsync()
+    {
+        await LoadNotificationsAsync();
+    }
+
+    private int UnreadCount => Notifications.Count(n => !n.IsRead);
+
+    private IEnumerable<Notification> FilteredNotifications => (Filter switch
+    {
+        "Unread" => Notifications.Where(n => !n.IsRead),
+        "Critical" => Notifications.Where(n => n.Priority == "Critical"),
+        _ => Notifications
+    }).Where(n =>
+        string.IsNullOrWhiteSpace(SearchQuery) ||
+        n.Title.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) ||
+        n.Message.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase));
+    private List<Notification> FilteredNotificationsList => FilteredNotifications.ToList();
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredNotificationsList.Count / (double)pageSize));
+    private List<Notification> PagedFilteredNotifications => FilteredNotificationsList
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    private void SetFilter(string filter)
+    {
+        Filter = filter;
+        currentPage = 1;
+    }
+
+    private void OnSearchChanged()
+    {
+        currentPage = 1;
+    }
+
+    private void PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage >= TotalPages) return;
+        currentPage++;
+    }
+
+    private void MarkRead(Notification note)
+    {
+        note.IsRead = true;
+        if (currentPage > TotalPages)
+        {
+            currentPage = TotalPages;
+        }
+        StateHasChanged();
+    }
+
+    private void MarkAllRead()
+    {
+        foreach (var note in Notifications) 
+        {
+            note.IsRead = true;
+        }
+        currentPage = 1;
+        StateHasChanged();
+    }
+
+    private string GetBorderClass(string type) => type switch
+    {
+        "System" => "border-red-400",
+        "Ticket" => "border-blue-400",
+        "Order" => "border-violet-400",
+        _ => "border-gray-100"
+    };
+
+    private string GetCardClass(Notification note)
+    {
+        var baseClass = note.Type switch
+        {
+            "System" => "bg-white",
+            "Ticket" => "bg-white",
+            "Order" => "bg-white",
+            _ => "bg-white"
+        };
+
+        return note.IsRead ? $"{baseClass} opacity-60 grayscale-[0.5]" : baseClass;
+    }
+
+    private string GetIconClass(string type) => type switch
+    {
+        "System" => "bg-red-50 text-red-600",
+        "Ticket" => "bg-blue-50 text-blue-600",
+        "Order" => "bg-violet-50 text-violet-600",
+        _ => "bg-gray-50 text-gray-600"
+    };
+
+    private string GetTimeAgo(DateTime dateTime)
+    {
+        var timeSpan = DateTime.UtcNow - dateTime;
+
+        if (timeSpan.TotalSeconds < 60)
+        {
+            return $"{(int)timeSpan.TotalSeconds} seconds ago";
+        }
+        else if (timeSpan.TotalMinutes < 60)
+        {
+            return $"{(int)timeSpan.TotalMinutes} minute{((int)timeSpan.TotalMinutes != 1 ? "s" : "")} ago";
+        }
+        else if (timeSpan.TotalHours < 24)
+        {
+            return $"{(int)timeSpan.TotalHours} hour{((int)timeSpan.TotalHours != 1 ? "s" : "")} ago";
+        }
+        else if (timeSpan.TotalDays < 7)
+        {
+            return $"{(int)timeSpan.TotalDays} day{((int)timeSpan.TotalDays != 1 ? "s" : "")} ago";
+        }
+        else
+        {
+            return dateTime.ToString("MMM dd, yyyy");
+        }
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+    }
+
+    public class Notification
+    {
+        public int Id { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string TimeAgo => GetTimeAgo(CreatedAt);
+        public bool IsRead { get; set; }
+        public string Priority { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+
+        private string GetTimeAgo(DateTime dateTime)
+        {
+            var timeSpan = DateTime.UtcNow - dateTime;
+
+            if (timeSpan.TotalSeconds < 60)
+            {
+                return $"{(int)timeSpan.TotalSeconds} seconds ago";
+            }
+            else if (timeSpan.TotalMinutes < 60)
+            {
+                return $"{(int)timeSpan.TotalMinutes} minute{((int)timeSpan.TotalMinutes != 1 ? "s" : "")} ago";
+            }
+            else if (timeSpan.TotalHours < 24)
+            {
+                return $"{(int)timeSpan.TotalHours} hour{((int)timeSpan.TotalHours != 1 ? "s" : "")} ago";
+            }
+            else if (timeSpan.TotalDays < 7)
+            {
+                return $"{(int)timeSpan.TotalDays} day{((int)timeSpan.TotalDays != 1 ? "s" : "")} ago";
+            }
+            else
+            {
+                return dateTime.ToString("MMM dd, yyyy");
+            }
+        }
+    }
+}

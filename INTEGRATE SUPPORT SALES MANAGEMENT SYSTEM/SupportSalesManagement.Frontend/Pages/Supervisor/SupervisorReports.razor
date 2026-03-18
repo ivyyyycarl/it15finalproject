@@ -1,0 +1,270 @@
+@page "/supervisor/reports"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor,Admin")]
+@inject SupportSalesManagement.Frontend.Services.ApiClient Api
+
+<div class="p-6 space-y-4" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="flex items-center justify-between">
+        <h1 class="text-[22px] font-bold text-gray-900">Performance Reports</h1>
+        <button @onclick="LoadData" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Refresh
+            </span>
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <span class="ml-3 text-gray-500">Loading reports...</span>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">@errorMessage</div>
+    }
+    else
+    {
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-gradient-to-br from-slate-50 to-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <p class="text-sm text-gray-500">Total Agents</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">@agents.Count</p>
+            </div>
+            <div class="bg-gradient-to-br from-blue-50 to-white p-5 rounded-xl shadow-sm border border-blue-100">
+                <p class="text-sm text-gray-500">Total Tickets</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">@totalTickets</p>
+            </div>
+            <div class="bg-gradient-to-br from-emerald-50 to-white p-5 rounded-xl shadow-sm border border-emerald-100">
+                <p class="text-sm text-gray-500">Resolved Tickets</p>
+                <p class="text-2xl font-bold text-green-600 mt-1">@resolvedTickets</p>
+            </div>
+            <div class="bg-gradient-to-br from-violet-50 to-white p-5 rounded-xl shadow-sm border border-violet-100">
+                <p class="text-sm text-gray-500">Total Calls</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">@totalCalls</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Agent Performance Ranking</h3>
+                @if (agentPerformance.Any())
+                {
+                    <div class="space-y-4">
+                        @foreach (var agent in agentPerformance.OrderByDescending(a => a.Score).Take(10))
+                        {
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="font-medium text-gray-700">@agent.Name</span>
+                                    <span class="text-gray-500">@agent.Score.ToString("F0") pts</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div class="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" style="width: @(maxScore > 0 ? (agent.Score / maxScore * 100).ToString("F0") : "0")%"></div>
+                                </div>
+                                <div class="flex gap-4 mt-1 text-xs text-gray-400">
+                                    <span>@agent.TicketsResolved tickets</span>
+                                    <span>@agent.CallsHandled calls</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="py-8 text-center text-gray-400">No agent data available yet.</div>
+                }
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Ticket Status Distribution</h3>
+                @if (ticketStatusCounts.Any())
+                {
+                    <div class="space-y-3">
+                        @foreach (var status in ticketStatusCounts)
+                        {
+                            var pct = totalTickets > 0 ? (double)status.Value / totalTickets * 100 : 0;
+                            <div class="flex items-center gap-3">
+                                <span class="w-28 text-sm text-gray-600 truncate">@status.Key</span>
+                                <div class="flex-1 bg-gray-200 rounded-full h-2.5">
+                                    <div class="h-2.5 rounded-full transition-all duration-500 @GetStatusColor(status.Key)" style="width: @pct.ToString("F0")%"></div>
+                                </div>
+                                <span class="text-sm font-medium text-gray-700 w-12 text-right">@status.Value</span>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="py-8 text-center text-gray-400">No ticket data available yet.</div>
+                }
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h3 class="text-lg font-bold text-gray-900">Agent Detailed Metrics</h3>
+            </div>
+            @if (agentPerformance.Any())
+            {
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tickets Resolved</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Calls Handled</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Open Tickets</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            @foreach (var agent in pagedAgentPerformance)
+                            {
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 text-sm font-medium text-gray-900">@agent.Name</td>
+                                    <td class="px-6 py-4 text-sm text-gray-700">@agent.TicketsResolved</td>
+                                    <td class="px-6 py-4 text-sm text-gray-700">@agent.CallsHandled</td>
+                                    <td class="px-6 py-4 text-sm text-gray-700">@agent.OpenTickets</td>
+                                    <td class="px-6 py-4 text-sm font-semibold text-indigo-600">@agent.Score.ToString("F0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                    <span class="text-sm text-gray-500">Showing @startIndex-@endIndex of @agentPerformance.Count · Page @currentPage/@totalPages</span>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @onclick="PreviousPage" disabled="@(currentPage <= 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                        <button type="button" @onclick="NextPage" disabled="@(currentPage >= totalPages)" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="p-8 text-center text-gray-400">No agent metrics available.</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private string? errorMessage;
+    private List<SupportSalesManagement.Frontend.Models.User> agents = new();
+    private List<SupportSalesManagement.Frontend.Models.Ticket> allTickets = new();
+    private List<SupportSalesManagement.Frontend.Models.Call> allCalls = new();
+    private List<AgentPerf> agentPerformance = new();
+    private Dictionary<string, int> ticketStatusCounts = new();
+    private int totalTickets;
+    private int resolvedTickets;
+    private int totalCalls;
+    private double maxScore;
+    private int currentPage = 1;
+    private const int pageSize = 10;
+    private int totalPages => Math.Max(1, (int)Math.Ceiling(agentPerformance.Count / (double)pageSize));
+    private List<AgentPerf> pagedAgentPerformance => agentPerformance
+        .OrderByDescending(a => a.Score)
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+    private int startIndex => agentPerformance.Count == 0 ? 0 : ((currentPage - 1) * pageSize) + 1;
+    private int endIndex => agentPerformance.Count == 0 ? 0 : Math.Min(currentPage * pageSize, agentPerformance.Count);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var usersTask = Api.GetUsersAsync();
+            var ticketsTask = Api.GetTicketsAsync();
+            var callsTask = Api.GetCallsAsync();
+
+            await Task.WhenAll(usersTask, ticketsTask, callsTask);
+
+            var allUsers = await usersTask ?? new();
+            allTickets = await ticketsTask ?? new();
+            allCalls = await callsTask ?? new();
+
+            agents = allUsers.Where(u => u.Role.ToString() == "Agent" && u.IsActive).ToList();
+            totalTickets = allTickets.Count;
+            resolvedTickets = allTickets.Count(t => t.Status == "Resolved" || t.Status == "Closed");
+            totalCalls = allCalls.Count;
+
+            ticketStatusCounts = allTickets
+                .GroupBy(t => t.Status ?? "Unknown")
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            agentPerformance = agents.Select(a =>
+            {
+                var agentTickets = allTickets.Where(t => t.AssignedAgentId == a.Id).ToList();
+                var agentCalls = allCalls.Where(c => c.AgentId == a.Id).ToList();
+                var resolved = agentTickets.Count(t => t.Status == "Resolved" || t.Status == "Closed");
+                var open = agentTickets.Count(t => t.Status != "Resolved" && t.Status != "Closed");
+                var calls = agentCalls.Count;
+                var score = (resolved * 10) + (calls * 3);
+
+                return new AgentPerf
+                {
+                    Name = $"{a.FirstName} {a.LastName}",
+                    TicketsResolved = resolved,
+                    CallsHandled = calls,
+                    OpenTickets = open,
+                    Score = score
+                };
+            }).ToList();
+            currentPage = 1;
+
+            maxScore = agentPerformance.Any() ? agentPerformance.Max(a => a.Score) : 1;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading reports: {ex.Message}");
+            errorMessage = "Failed to load reports. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStatusColor(string status) => status switch
+    {
+        "Open" => "bg-blue-500",
+        "InProgress" => "bg-yellow-500",
+        "Resolved" => "bg-green-500",
+        "Closed" => "bg-gray-500",
+        "PendingCustomer" => "bg-orange-500",
+        "Reopened" => "bg-red-500",
+        _ => "bg-gray-400"
+    };
+
+    private void PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage >= totalPages) return;
+        currentPage++;
+    }
+
+    private class AgentPerf
+    {
+        public string Name { get; set; } = "";
+        public int TicketsResolved { get; set; }
+        public int CallsHandled { get; set; }
+        public int OpenTickets { get; set; }
+        public double Score { get; set; }
+    }
+}

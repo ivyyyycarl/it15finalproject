@@ -1,0 +1,388 @@
+@page "/customer/dashboard"
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject NavigationManager NavigationManager
+@inject ApiClient ApiClient
+@implements IDisposable
+@layout CustomerLayout
+
+<PageTitle>My Dashboard - SupportFlow</PageTitle>
+
+<div class="customer-theme bg-gradient-to-br from-[#f7fafc] via-[#f4f8ff] to-[#eef6ff]">
+    <div class="py-4 space-y-4">
+        <div class="grid grid-cols-1 gap-4">
+            <div class="bg-white rounded-2xl border border-blue-100 shadow-sm p-5 relative overflow-hidden">
+                <div class="absolute -right-5 -top-6 w-28 h-28 rounded-full bg-blue-50"></div>
+                <div class="absolute -left-4 -bottom-8 w-24 h-24 rounded-full bg-emerald-50"></div>
+                <div class="relative">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="text-[11px] font-bold text-blue-600 uppercase tracking-wider">Dashboard</p>
+                        <div class="flex items-center gap-2">
+                            <div class="rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-1.5">
+                                <p class="text-[12px] font-semibold text-cyan-700">@CurrentDateText</p>
+                                <p class="text-[12px] font-bold text-cyan-900">@CurrentTimeText</p>
+                            </div>
+                            <button @onclick="ToggleQuickActions"
+                                    class="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                                Quick Actions
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-2 flex items-center gap-2">
+                        <h2 class="text-[21px] font-extrabold text-gray-800">Hi, @(CurrentUser?.FirstName ?? "Customer")!</h2>
+                        <span class="inline-flex w-8 h-8 rounded-full bg-amber-100 text-amber-600 items-center justify-center animate-bounce">👋</span>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Your live account summary and latest activity.</p>
+                    @if (showQuickActions)
+                    {
+                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-3xl">
+                            <button @onclick='() => NavigateQuick("/customer/orders?tab=orders")' class="rounded-lg border border-blue-100 bg-white px-3 py-2 text-xs font-semibold text-blue-700 text-left inline-flex items-center gap-2"><span class="text-sm">🧾</span>Track My Orders</button>
+                            <button @onclick='() => NavigateQuick("/customer/support")' class="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 text-left inline-flex items-center gap-2"><span class="text-sm">💬</span>Contact Support Agent</button>
+                            <button @onclick='() => NavigateQuick("/customer/shop")' class="rounded-lg border border-violet-100 bg-white px-3 py-2 text-xs font-semibold text-violet-700 text-left inline-flex items-center gap-2"><span class="text-sm">🛍️</span>Shop New Arrivals</button>
+                        </div>
+                    }
+
+                    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                        <button @onclick='() => NavigationManager.NavigateTo("/customer/orders?tab=orders")' class="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white shadow-sm p-3.5 text-left hover:shadow-md transition-shadow min-h-[118px]">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="w-8 h-8 rounded-lg bg-white text-blue-600 border border-blue-100 flex items-center justify-center text-sm font-bold">⟳</div>
+                                <span class="text-[11px] text-blue-500 font-semibold">Live</span>
+                            </div>
+                            <p class="text-[11px] text-gray-500">Active Orders</p>
+                            <p class="text-2xl font-extrabold text-gray-800 mt-1">@ActiveOrdersCount</p>
+                        </button>
+
+                        <button @onclick='() => NavigationManager.NavigateTo("/customer/support")' class="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white shadow-sm p-3.5 text-left hover:shadow-md transition-shadow min-h-[118px]">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="w-8 h-8 rounded-lg bg-white text-indigo-600 border border-indigo-100 flex items-center justify-center text-sm font-bold">≣</div>
+                                <span class="text-[11px] text-indigo-500 font-semibold">Support</span>
+                            </div>
+                            <p class="text-[11px] text-gray-500">Open Tickets</p>
+                            <p class="text-2xl font-extrabold text-gray-800 mt-1">@PendingTicketsCount</p>
+                        </button>
+
+                        <button @onclick='() => NavigationManager.NavigateTo("/customer/orders?tab=orders")' class="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white shadow-sm p-3.5 text-left hover:shadow-md transition-shadow min-h-[118px]">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="w-8 h-8 rounded-lg bg-white text-emerald-600 border border-emerald-100 flex items-center justify-center text-sm font-bold">₱</div>
+                                <span class="text-[11px] text-emerald-500 font-semibold">Lifetime</span>
+                            </div>
+                            <p class="text-[11px] text-gray-500">Total Spent</p>
+                            <p class="text-2xl font-extrabold text-gray-800 mt-1">₱@TotalSpent.ToString("N0")</p>
+                        </button>
+
+                        <button @onclick='() => NavigationManager.NavigateTo("/customer/orders?tab=orders")' class="rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white shadow-sm p-3.5 text-left hover:shadow-md transition-shadow min-h-[118px]">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="w-8 h-8 rounded-lg bg-white text-amber-600 border border-amber-100 flex items-center justify-center text-sm font-bold">✓</div>
+                                <span class="text-[11px] text-amber-500 font-semibold">History</span>
+                            </div>
+                            <p class="text-[11px] text-gray-500">Completed Orders</p>
+                            <p class="text-2xl font-extrabold text-gray-800 mt-1">@CompletedOrdersCount</p>
+                        </button>
+                    </div>
+
+                    @if (usageOverview?.Metrics?.Any() == true)
+                    {
+                        <div class="mt-4 rounded-xl border border-violet-100 bg-violet-50/50 p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-xs font-bold uppercase tracking-wide text-violet-700">Subscription Usage</p>
+                                <a href="/subscription/overview" class="text-[11px] font-semibold text-violet-700 hover:text-violet-800">Manage Plan</a>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                @foreach (var metric in usageOverview.Metrics.Take(3))
+                                {
+                                    <div class="rounded-lg border border-violet-100 bg-white p-2.5">
+                                        <p class="text-[11px] text-gray-500">@metric.Label</p>
+                                        <p class="text-sm font-bold text-gray-800 mt-1">@metric.UsedQuantity / @metric.AllowedQuantity @metric.Unit</p>
+                                        <p class="text-[11px] @(metric.IsExceeded ? "text-red-600" : metric.IsNearLimit ? "text-amber-600" : "text-emerald-600")">
+                                            @metric.UtilizationPercent.ToString("0.##")%
+                                        </p>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="p-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-white flex items-center justify-between">
+                    <h3 class="text-base font-bold text-gray-800">Recent Orders</h3>
+                    <a href="/customer/orders" class="text-xs font-semibold text-blue-600 hover:text-blue-700">View All</a>
+                </div>
+                <div class="p-4 space-y-2.5">
+                    @if (RecentOrders == null)
+                    {
+                        <p class="text-gray-500 text-center text-sm">Loading orders...</p>
+                    }
+                    else if (!RecentOrders.Any())
+                    {
+                        <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-5 text-center">
+                            <p class="text-sm font-semibold text-gray-600">No recent orders found.</p>
+                            <a href="/customer/shop" class="text-xs text-blue-600 font-semibold mt-1 inline-block">Start shopping</a>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var order in RecentOrders)
+                        {
+                            <div class="rounded-xl border border-gray-100 bg-gray-50/80 px-3.5 py-3">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div>
+                                        <p class="text-sm font-semibold text-gray-800">Order #@order.OrderNumber</p>
+                                        <p class="text-[11px] text-gray-500">@order.OrderDate.ToString("MMM dd, yyyy")</p>
+                                    </div>
+                                    <span class="inline-flex px-2 py-1 rounded-full text-[11px] font-semibold @GetStatusColor(order.Status)">@order.Status</span>
+                                </div>
+                                <p class="text-sm font-bold text-gray-900 mt-1.5">₱@order.TotalAmount.ToString("N2")</p>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="p-4 border-b border-violet-100 bg-gradient-to-r from-violet-50 to-white flex items-center justify-between">
+                    <h3 class="text-base font-bold text-gray-800">Support Tickets</h3>
+                    <a href="/customer/support" class="text-xs font-semibold text-violet-600 hover:text-violet-700">View All</a>
+                </div>
+                <div class="p-4 space-y-2.5">
+                    @if (RecentTickets == null)
+                    {
+                        <p class="text-gray-500 text-center text-sm">Loading tickets...</p>
+                    }
+                    else if (!RecentTickets.Any())
+                    {
+                        <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-5 text-center">
+                            <p class="text-sm font-semibold text-gray-600">No active tickets.</p>
+                            <a href="/customer/support" class="text-xs text-violet-600 font-semibold mt-1 inline-block">Create support ticket</a>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var ticket in RecentTickets)
+                        {
+                            <div class="rounded-xl border border-gray-100 bg-gray-50/80 px-3.5 py-3">
+                                <div class="flex items-center justify-between gap-2">
+                                    <p class="text-sm font-semibold text-gray-800 truncate">@ticket.Title</p>
+                                    <span class="inline-flex px-2 py-1 rounded-full text-[11px] font-semibold bg-gray-200 text-gray-800">@ticket.Status</span>
+                                </div>
+                                <p class="text-[11px] text-gray-500 mt-1.5">Ticket #@ticket.TicketNumber · @ticket.CreatedAt.ToString("MMM dd, yyyy")</p>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private PeriodicTimer? _clockTimer;
+    private DateTime _now = DateTime.Now;
+    private User? CurrentUser;
+    private List<Order> RecentOrders = new();
+    private List<Ticket> RecentTickets = new();
+    private List<Order> allOrders = new();
+    private List<Ticket> allTickets = new();
+    private List<ChartPoint> ordersMonthlyData = new();
+    private List<ChartPoint> ticketStatusData = new();
+
+    private int ActiveOrdersCount;
+    private int PendingTicketsCount;
+    private decimal TotalSpent;
+    private int TotalOrdersCount;
+    private int CompletedOrdersCount;
+    private bool showQuickActions;
+    private SubscriptionUsageOverviewModel? usageOverview;
+    private string CurrentDateText => _now.ToString("dddd, MMM dd yyyy");
+    private string CurrentTimeText => _now.ToString("hh:mm:ss tt");
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            CurrentUser = await ApiClient.GetCurrentUserAsync();
+            if (CurrentUser == null) return;
+
+            var customer = await ApiClient.GetCustomerByUserIdAsync(CurrentUser.Id);
+            if (customer == null) return;
+
+            var customerId = customer.Id;
+
+            var ordersTask = ApiClient.GetOrdersByCustomerAsync(customerId);
+            var ticketsTask = ApiClient.GetTicketsByCustomerAsync(customerId);
+            var usageTask = ApiClient.GetSubscriptionUsageOverviewAsync();
+            await Task.WhenAll(ordersTask, ticketsTask, usageTask);
+
+            var myOrders = await ordersTask ?? new List<Order>();
+            allOrders = myOrders;
+            RecentOrders = myOrders.OrderByDescending(o => o.OrderDate).Take(3).ToList();
+            ActiveOrdersCount = myOrders.Count(o => o.Status != "Completed" && o.Status != "Cancelled" && o.Status != "Refunded");
+            CompletedOrdersCount = myOrders.Count(o =>
+                string.Equals(o.Status, "Completed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(o.Status, "Delivered", StringComparison.OrdinalIgnoreCase));
+            TotalSpent = myOrders.Sum(o => o.TotalAmount);
+            TotalOrdersCount = myOrders.Count;
+
+            var myTickets = await ticketsTask ?? new List<Ticket>();
+            allTickets = myTickets;
+            RecentTickets = myTickets.OrderByDescending(t => t.CreatedAt).Take(2).ToList();
+            PendingTicketsCount = myTickets.Count(t => t.Status != "Closed" && t.Status != "Resolved");
+            usageOverview = await usageTask;
+            BuildCharts();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+        }
+
+        _clockTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        _ = RunClockAsync();
+    }
+
+    private string GetStatusColor(string status)
+    {
+        return status?.ToLower() switch
+        {
+            "completed" => "bg-green-100 text-green-800",
+            "processing" => "bg-blue-100 text-blue-800",
+            "shipped" => "bg-indigo-100 text-indigo-800",
+            "cancelled" => "bg-red-100 text-red-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private string GetPriorityBorderColor(string priority)
+    {
+        return priority?.ToLower() switch
+        {
+            "high" or "critical" => "border-red-500",
+            "medium" => "border-yellow-500",
+            "low" => "border-green-500",
+            _ => "border-gray-300"
+        };
+    }
+
+    private void BuildCharts()
+    {
+        var months = Enumerable.Range(0, 6)
+            .Select(i => new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-5 + i))
+            .ToList();
+
+        ordersMonthlyData = months
+            .Select(m => new ChartPoint
+            {
+                Label = m.ToString("MMM"),
+                Value = allOrders.Count(o => o.OrderDate.Year == m.Year && o.OrderDate.Month == m.Month)
+            })
+            .ToList();
+
+        ticketStatusData = allTickets
+            .GroupBy(t => string.IsNullOrWhiteSpace(t.Status) ? "Unknown" : t.Status)
+            .Select(g => new ChartPoint
+            {
+                Label = g.Key,
+                Value = g.Count()
+            })
+            .OrderByDescending(x => x.Value)
+            .Take(6)
+            .ToList();
+    }
+
+    private List<DashboardNote> BuildNotifications()
+    {
+        var notes = new List<DashboardNote>();
+
+        if (RecentOrders.Any())
+        {
+            var latest = RecentOrders.First();
+            notes.Add(new DashboardNote
+            {
+                Icon = "O",
+                IconBg = "bg-blue-100",
+                IconText = "text-blue-700",
+                Title = $"Order #{latest.OrderNumber} updated",
+                Subtitle = latest.Status
+            });
+        }
+
+        if (RecentTickets.Any())
+        {
+            var latestTicket = RecentTickets.First();
+            notes.Add(new DashboardNote
+            {
+                Icon = "T",
+                IconBg = "bg-amber-100",
+                IconText = "text-amber-700",
+                Title = latestTicket.Title,
+                Subtitle = $"Ticket #{latestTicket.TicketNumber}"
+            });
+        }
+
+        if (notes.Count == 0)
+        {
+            notes.Add(new DashboardNote
+            {
+                Icon = "i",
+                IconBg = "bg-emerald-100",
+                IconText = "text-emerald-700",
+                Title = "Welcome to your dashboard",
+                Subtitle = "Start by placing your first order"
+            });
+        }
+
+        return notes.Take(3).ToList();
+    }
+
+    private class ChartPoint
+    {
+        public string Label { get; set; } = string.Empty;
+        public int Value { get; set; }
+    }
+
+    private class DashboardNote
+    {
+        public string Icon { get; set; } = "i";
+        public string IconBg { get; set; } = "bg-gray-100";
+        public string IconText { get; set; } = "text-gray-700";
+        public string Title { get; set; } = string.Empty;
+        public string Subtitle { get; set; } = string.Empty;
+    }
+
+    private void ToggleQuickActions()
+    {
+        showQuickActions = !showQuickActions;
+    }
+
+    private void NavigateQuick(string url)
+    {
+        showQuickActions = false;
+        NavigationManager.NavigateTo(url);
+    }
+
+    private async Task RunClockAsync()
+    {
+        if (_clockTimer == null) return;
+        try
+        {
+            while (await _clockTimer.WaitForNextTickAsync())
+            {
+                _now = DateTime.Now;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        _clockTimer?.Dispose();
+    }
+}

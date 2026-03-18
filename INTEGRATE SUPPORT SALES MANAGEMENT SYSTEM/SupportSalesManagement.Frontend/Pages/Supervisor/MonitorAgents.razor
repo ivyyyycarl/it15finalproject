@@ -1,0 +1,233 @@
+@page "/supervisor/calls/monitoring"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor")]
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Monitor Agents - Supervisor</PageTitle>
+
+<div class="p-6 space-y-4" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="mb-6">
+        <h1 class="text-[22px] font-bold text-gray-900">Monitor Agents</h1>
+        <p class="text-sm text-gray-500 mt-1">Real-time monitoring of agent call activities</p>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(actionMessage))
+    {
+        <div class="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            @actionMessage
+        </div>
+    }
+
+    <!-- Active Calls Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-gradient-to-br from-emerald-50 to-white p-5 rounded-xl border border-emerald-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Active Calls</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-1">12</p>
+                </div>
+                <div class="bg-green-100 p-3 rounded-full">
+                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-50 to-white p-5 rounded-xl border border-blue-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Available Agents</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-1">8</p>
+                </div>
+                <div class="bg-blue-100 p-3 rounded-full">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-amber-50 to-white p-5 rounded-xl border border-amber-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">On Break</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-1">3</p>
+                </div>
+                <div class="bg-yellow-100 p-3 rounded-full">
+                    <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-violet-50 to-white p-5 rounded-xl border border-violet-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Avg Call Time</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-1">5:24</p>
+                </div>
+                <div class="bg-purple-100 p-3 rounded-full">
+                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Agents Table -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Active Agents</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Call</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Calls Today</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    @foreach (var agent in agents)
+                    {
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="h-10 w-10 flex-shrink-0">
+                                        <div
+                                            class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
+                                            @agent.Initials
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">@agent.Name</div>
+                                        <div class="text-sm text-gray-500">@agent.Email</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span
+                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full @GetStatusClass(agent.Status)">
+                                    @agent.Status
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                @(agent.CurrentCall ?? "N/A")
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                @(agent.CallDuration ?? "00:00")
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                @agent.CallsToday
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button @onclick="() => MonitorAgent(agent)"
+                                    class="text-blue-600 hover:text-blue-900 mr-3">Monitor</button>
+                                @if (agent.Status == "On Call")
+                                {
+                                    <button @onclick="() => ListenToCall(agent)"
+                                        class="text-gray-600 hover:text-gray-900">Listen</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<AgentStatus> agents = new();
+    private string actionMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var users = await ApiClient.GetUsersAsync();
+        var agentUsers = (users ?? new List<User>()).Where(u => u.Role == UserRole.Agent && u.IsActive).ToList();
+        var allCalls = await ApiClient.GetCallsAsync() ?? new List<Call>();
+
+        agents = agentUsers.Select(u =>
+        {
+            var agentCalls = allCalls.Where(c => c.AgentId == u.Id).ToList();
+            var activeCall = agentCalls.FirstOrDefault(c => c.Status == "InProgress");
+            var todayCalls = agentCalls.Count(c => c.StartTime.Date == DateTime.Today);
+
+            string? currentCallDisplay = null;
+            string? callDuration = null;
+            if (activeCall != null)
+            {
+                currentCallDisplay = activeCall.Subject ?? $"Customer #{activeCall.CustomerId}";
+                var elapsed = DateTime.Now - activeCall.StartTime;
+                callDuration = elapsed.ToString(@"mm\:ss");
+            }
+
+            return new AgentStatus
+            {
+                AgentId = u.Id,
+                Name = $"{u.FirstName} {u.LastName}",
+                Email = u.Email,
+                Initials = $"{u.FirstName[0]}{u.LastName[0]}",
+                Status = activeCall != null ? "On Call" : "Available",
+                CurrentCall = currentCallDisplay,
+                ActiveCallId = activeCall?.Id,
+                CallDuration = callDuration,
+                CallsToday = todayCalls
+            };
+        }).ToList();
+    }
+
+    private void MonitorAgent(AgentStatus agent)
+    {
+        actionMessage = $"Opening performance view for {agent.Name}.";
+        NavigationManager.NavigateTo($"/supervisor/agents/performance?agentId={agent.AgentId}");
+    }
+
+    private void ListenToCall(AgentStatus agent)
+    {
+        if (!agent.ActiveCallId.HasValue)
+        {
+            actionMessage = $"{agent.Name} is no longer on an active call.";
+            return;
+        }
+
+        actionMessage = $"Opening call logs for {agent.Name} (Call #{agent.ActiveCallId.Value}).";
+        NavigationManager.NavigateTo($"/supervisor/calls?callId={agent.ActiveCallId.Value}");
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status switch
+        {
+            "On Call" => "bg-green-100 text-green-800",
+            "Available" => "bg-blue-100 text-blue-800",
+            "On Break" => "bg-yellow-100 text-yellow-800",
+            "Offline" => "bg-gray-100 text-gray-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private class AgentStatus
+    {
+        public int AgentId { get; set; }
+        public string Name { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Initials { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string? CurrentCall { get; set; }
+        public int? ActiveCallId { get; set; }
+        public string? CallDuration { get; set; }
+        public int CallsToday { get; set; }
+    }
+}

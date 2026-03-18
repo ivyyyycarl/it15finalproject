@@ -1,0 +1,10 @@
+@page "/superadmin/reports/performance"
+@layout SuperAdminLayout
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.NavigateTo("/superadmin/reports/financial", replace: true);
+    }
+}

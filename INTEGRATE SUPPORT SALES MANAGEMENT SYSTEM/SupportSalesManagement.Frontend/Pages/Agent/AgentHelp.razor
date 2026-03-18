@@ -1,0 +1,76 @@
+@page "/agent/help"
+@layout AgentLayout
+
+<PageTitle>Help & Support | Agent Workspace</PageTitle>
+
+<div class="h-[calc(100vh-theme(spacing.16))] flex flex-col bg-gray-50 overflow-hidden" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
+        <div>
+            <h1 class="text-[21px] font-bold text-[#1E1E2D]">Help & Support</h1>
+            <p class="text-[12px] text-gray-500">Resources and guides for using the agent workspace</p>
+        </div>
+        <div class="hidden md:flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+            Agent Knowledge Base
+        </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-6">
+        <div class="w-full space-y-5">
+            <div class="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-blue-50 to-white p-5 shadow-sm">
+                <h2 class="text-base font-bold text-[#1E1E2D] mb-1">Support Operations Playbook</h2>
+                <p class="text-sm text-gray-600">Use these quick routes to move faster across tickets, calls, and customer context.</p>
+                <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <a href="/agent/tickets/assigned" class="rounded-xl border border-blue-100 bg-white px-4 py-3 hover:shadow-sm transition-all">
+                        <p class="text-xs uppercase font-bold text-blue-600">Tickets</p>
+                        <p class="text-sm font-semibold text-gray-800 mt-1">Assigned Cases</p>
+                    </a>
+                    <a href="/agent/calls/history" class="rounded-xl border border-violet-100 bg-white px-4 py-3 hover:shadow-sm transition-all">
+                        <p class="text-xs uppercase font-bold text-violet-600">Call Logs</p>
+                        <p class="text-sm font-semibold text-gray-800 mt-1">Recent Interactions</p>
+                    </a>
+                    <a href="/agent/customers" class="rounded-xl border border-emerald-100 bg-white px-4 py-3 hover:shadow-sm transition-all">
+                        <p class="text-xs uppercase font-bold text-emerald-600">Customers</p>
+                        <p class="text-sm font-semibold text-gray-800 mt-1">Profile Lookup</p>
+                    </a>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
+                    <div class="text-lg mb-2">📘</div>
+                    <h3 class="font-bold text-gray-900 mb-1">User Guide</h3>
+                    <p class="text-sm text-gray-600">Learn ticket, call, and order workflows quickly.</p>
+                </div>
+                <div class="rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm">
+                    <div class="text-lg mb-2">❓</div>
+                    <h3 class="font-bold text-gray-900 mb-1">FAQs</h3>
+                    <p class="text-sm text-gray-600">Answers to common questions from agents.</p>
+                </div>
+                <div class="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm">
+                    <div class="text-lg mb-2">🟢</div>
+                    <h3 class="font-bold text-gray-900 mb-1">System Status</h3>
+                    <p class="text-sm text-gray-600">Check if services are available and healthy.</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                <h2 class="text-base font-bold text-gray-900 mb-4">Common Questions</h2>
+                <div class="space-y-3 text-sm">
+                    <div class="border-b border-gray-100 pb-3">
+                        <p class="font-semibold text-gray-900 mb-1">How do I escalate a ticket?</p>
+                        <p class="text-gray-600">Open a ticket, then click `Escalate` in the ticket list action column.</p>
+                    </div>
+                    <div class="border-b border-gray-100 pb-3">
+                        <p class="font-semibold text-gray-900 mb-1">How do I log a call?</p>
+                        <p class="text-gray-600">Go to `Call Logs`, select customer, then click `Start Call`.</p>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-gray-900 mb-1">Where do I check my notifications?</p>
+                        <p class="text-gray-600">Open `Notifications` in the sidebar to review system alerts and queue updates.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,335 @@
+using Microsoft.EntityFrameworkCore;
+using INTEGRATE_SUPPORT_SALES_MANAGEMENT_SYSTEM.Data;
+using INTEGRATE_SUPPORT_SALES_MANAGEMENT_SYSTEM.DTOs;
+using INTEGRATE_SUPPORT_SALES_MANAGEMENT_SYSTEM.Models;
+
+namespace INTEGRATE_SUPPORT_SALES_MANAGEMENT_SYSTEM.Services
+{
+    public class CustomerService : ICustomerService
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly ILogger<CustomerService> _logger;
+
+        public CustomerService(ApplicationDbContext context, ILogger<CustomerService> logger)
+        {
+            _context = context;
+            _logger = logger;
+        }
+
+        public async Task<IEnumerable<CustomerDto>> GetAllCustomersAsync()
+        {
+            var customers = await _context.Customers
+                .Include(c => c.Calls)
+                .Include(c => c.Tickets.Where(t => t.Status != TicketStatus.Closed))
+                .Include(c => c.Orders)
+                .OrderBy(c => c.FirstName)
+                .ThenBy(c => c.LastName)
+                .ToListAsync();
+
+            return customers.Select(c => new CustomerDto
+            {
+                Id = c.Id,
+                FirstName = c.FirstName,
+                LastName = c.LastName,
+                Email = c.Email,
+                Phone = c.Phone,
+                Company = c.Company,
+                Address = c.Address,
+                City = c.City,
+                State = c.State,
+                PostalCode = c.PostalCode,
+                Country = c.Country,
+                Type = c.Type,
+                CreatedAt = c.CreatedAt,
+                UpdatedAt = c.UpdatedAt,
+                TotalCalls = c.Calls.Count,
+                OpenTickets = c.Tickets.Count,
+                TotalOrders = c.Orders.Count,
+                TotalSpent = c.Orders.Where(o => o.Status != OrderStatus.Cancelled).Sum(o => o.FinalAmount)
+            });
+        }
+
+        public async Task<CustomerDto?> GetCustomerByIdAsync(int id)
+        {
+            var customer = await _context.Customers
+                .Include(c => c.Calls)
+                .Include(c => c.Tickets.Where(t => t.Status != TicketStatus.Closed))
+                .Include(c => c.Orders)
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (customer == null) return null;
+
+            return new CustomerDto
+            {
+                Id = customer.Id,
+                FirstName = customer.FirstName,
+                LastName = customer.LastName,
+                Email = customer.Email,
+                Phone = customer.Phone,
+                Company = customer.Company,
+                Address = customer.Address,
+                City = customer.City,
+                State = customer.State,
+                PostalCode = customer.PostalCode,
+                Country = customer.Country,
+                Type = customer.Type,
+                CreatedAt = customer.CreatedAt,
+                UpdatedAt = customer.UpdatedAt,
+                TotalCalls = customer.Calls.Count,
+                OpenTickets = customer.Tickets.Count,
+                TotalOrders = customer.Orders.Count,
+                TotalSpent = customer.Orders.Where(o => o.Status != OrderStatus.Cancelled).Sum(o => o.FinalAmount)
+            };
+        }
+
+        public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerDto createCustomerDto)
+        {
+            var existingCustomer = await _context.Customers
+                .FirstOrDefaultAsync(c => c.Email.ToLower() == createCustomerDto.Email.ToLower());
+
+            if (existingCustomer != null)
+            {
+                throw new InvalidOperationException("Customer with this email already exists");
+            }
+
+            var customer = new Customer
+            {
+                FirstName = createCustomerDto.FirstName,
+                LastName = createCustomerDto.LastName,
+                Email = createCustomerDto.Email,
+                Phone = createCustomerDto.Phone,
+                Company = createCustomerDto.Company,
+                Address = createCustomerDto.Address,
+                City = createCustomerDto.City,
+                State = createCustomerDto.State,
+                PostalCode = createCustomerDto.PostalCode,
+                Country = createCustomerDto.Country,
+                Type = createCustomerDto.Type,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.Customers.Add(customer);
+            await _context.SaveChangesAsync();
+
+            return new CustomerDto
+            {
+                Id = customer.Id,
+                FirstName = customer.FirstName,
+                LastName = customer.LastName,
+                Email = customer.Email,
+                Phone = customer.Phone,
+                Company = customer.Company,
+                Address = customer.Address,
+                City = customer.City,
+                State = customer.State,
+                PostalCode = customer.PostalCode,
+                Country = customer.Country,
+                Type = customer.Type,
+                CreatedAt = customer.CreatedAt,
+                UpdatedAt = customer.UpdatedAt,
+                TotalCalls = 0,
+                OpenTickets = 0,
+                TotalOrders = 0,
+                TotalSpent = 0
+            };
+        }
+
+        public async Task<CustomerDto?> UpdateCustomerAsync(int id, UpdateCustomerDto updateCustomerDto)
+        {
+            var customer = await _context.Customers
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (customer == null) return null;
+
+            if (!string.IsNullOrEmpty(updateCustomerDto.FirstName))
+                customer.FirstName = updateCustomerDto.FirstName;
+
+            if (!string.IsNullOrEmpty(updateCustomerDto.LastName))
+                customer.LastName = updateCustomerDto.LastName;
+
+            if (!string.IsNullOrEmpty(updateCustomerDto.Email))
+            {
+                var existingCustomer = await _context.Customers
+                    .FirstOrDefaultAsync(c => c.Email.ToLower() == updateCustomerDto.Email.ToLower() && c.Id != id);
+
+                if (existingCustomer != null)
+                {
+                    throw new InvalidOperationException("Email is already taken by another customer");
+                }
+
+                customer.Email = updateCustomerDto.Email;
+            }
+
+            if (updateCustomerDto.Phone != null)
+                customer.Phone = updateCustomerDto.Phone;
+
+            if (updateCustomerDto.Company != null)
+                customer.Company = updateCustomerDto.Company;
+
+            if (updateCustomerDto.Address != null)
+                customer.Address = updateCustomerDto.Address;
+
+            if (updateCustomerDto.City != null)
+                customer.City = updateCustomerDto.City;
+
+            if (updateCustomerDto.State != null)
+                customer.State = updateCustomerDto.State;
+
+            if (updateCustomerDto.PostalCode != null)
+                customer.PostalCode = updateCustomerDto.PostalCode;
+
+            if (updateCustomerDto.Country != null)
+                customer.Country = updateCustomerDto.Country;
+
+            if (updateCustomerDto.Type.HasValue)
+                customer.Type = updateCustomerDto.Type.Value;
+
+            customer.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return await GetCustomerByIdAsync(id);
+        }
+
+        public async Task<bool> DeleteCustomerAsync(int id)
+        {
+            var customer = await _context.Customers
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (customer == null) return false;
+
+            _context.Customers.Remove(customer);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<CustomerDto?> GetCustomerByEmailAsync(string email)
+        {
+            var customer = await _context.Customers
+                .Include(c => c.Calls)
+                .Include(c => c.Tickets.Where(t => t.Status != TicketStatus.Closed))
+                .Include(c => c.Orders)
+                .FirstOrDefaultAsync(c => c.Email.ToLower() == email.ToLower());
+
+            if (customer == null) return null;
+
+            return new CustomerDto
+            {
+                Id = customer.Id,
+                FirstName = customer.FirstName,
+                LastName = customer.LastName,
+                Email = customer.Email,
+                Phone = customer.Phone,
+                Company = customer.Company,
+                Address = customer.Address,
+                City = customer.City,
+                State = customer.State,
+                PostalCode = customer.PostalCode,
+                Country = customer.Country,
+                Type = customer.Type,
+                CreatedAt = customer.CreatedAt,
+                UpdatedAt = customer.UpdatedAt,
+                TotalCalls = customer.Calls.Count,
+                OpenTickets = customer.Tickets.Count,
+                TotalOrders = customer.Orders.Count,
+                TotalSpent = customer.Orders.Where(o => o.Status != OrderStatus.Cancelled).Sum(o => o.FinalAmount)
+            };
+        }
+
+        public async Task<CustomerInteractionDto> GetCustomerInteractionHistoryAsync(int customerId)
+        {
+            var customer = await _context.Customers
+                .Include(c => c.Calls.OrderByDescending(call => call.StartTime).Take(5))
+                .Include(c => c.Tickets.OrderByDescending(ticket => ticket.CreatedAt).Take(5))
+                .Include(c => c.Orders.OrderByDescending(order => order.CreatedAt).Take(5))
+                .FirstOrDefaultAsync(c => c.Id == customerId);
+
+            if (customer == null)
+                throw new InvalidOperationException("Customer not found");
+
+            var recentCalls = customer.Calls.Select(c => new CallDto
+            {
+                Id = c.Id,
+                AgentId = c.AgentId,
+                Type = c.Type,
+                Status = c.Status,
+                StartTime = c.StartTime,
+                EndTime = c.EndTime,
+                Duration = c.Duration,
+                Subject = c.Subject,
+                Notes = c.Notes,
+                Outcome = c.Outcome,
+                IsEscalated = c.IsEscalated,
+                CreatedAt = c.CreatedAt
+            }).ToList();
+
+            var recentTickets = customer.Tickets.Select(t => new TicketDto
+            {
+                Id = t.Id,
+                TicketNumber = t.TicketNumber,
+                Title = t.Title,
+                Status = t.Status,
+                Priority = t.Priority,
+                CreatedAt = t.CreatedAt,
+                UpdatedAt = t.UpdatedAt
+            }).ToList();
+
+            var recentOrders = customer.Orders.Select(o => new OrderDto
+            {
+                Id = o.Id,
+                OrderNumber = o.OrderNumber,
+                Status = o.Status,
+                FinalAmount = o.FinalAmount,
+                OrderDate = o.OrderDate,
+                CreatedAt = o.CreatedAt
+            }).ToList();
+
+            return new CustomerInteractionDto
+            {
+                CustomerId = customer.Id,
+                CustomerName = $"{customer.FirstName} {customer.LastName}",
+                RecentCalls = recentCalls,
+                RecentTickets = recentTickets,
+                RecentOrders = recentOrders
+            };
+        }
+
+        public async Task<IEnumerable<CustomerDto>> SearchCustomersAsync(string searchTerm)
+        {
+            var customers = await _context.Customers
+                .Include(c => c.Calls)
+                .Include(c => c.Tickets.Where(t => t.Status != TicketStatus.Closed))
+                .Include(c => c.Orders)
+                .Where(c => c.FirstName.ToLower().Contains(searchTerm.ToLower()) ||
+                           c.LastName.ToLower().Contains(searchTerm.ToLower()) ||
+                           c.Email.ToLower().Contains(searchTerm.ToLower()) ||
+                           (c.Company != null && c.Company.ToLower().Contains(searchTerm.ToLower())))
+                .OrderBy(c => c.FirstName)
+                .ThenBy(c => c.LastName)
+                .ToListAsync();
+
+            return customers.Select(c => new CustomerDto
+            {
+                Id = c.Id,
+                FirstName = c.FirstName,
+                LastName = c.LastName,
+                Email = c.Email,
+                Phone = c.Phone,
+                Company = c.Company,
+                Address = c.Address,
+                City = c.City,
+                State = c.State,
+                PostalCode = c.PostalCode,
+                Country = c.Country,
+                Type = c.Type,
+                CreatedAt = c.CreatedAt,
+                UpdatedAt = c.UpdatedAt,
+                TotalCalls = c.Calls.Count,
+                OpenTickets = c.Tickets.Count,
+                TotalOrders = c.Orders.Count,
+                TotalSpent = c.Orders.Where(o => o.Status != OrderStatus.Cancelled).Sum(o => o.FinalAmount)
+            });
+        }
+    }
+}

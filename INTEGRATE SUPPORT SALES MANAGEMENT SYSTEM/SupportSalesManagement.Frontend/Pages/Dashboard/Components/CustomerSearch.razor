@@ -1,0 +1,139 @@
+@* Customer Search Component with Profile View *@
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+    <div class="flex items-center space-x-3 mb-4">
+        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input type="text" @bind="searchQuery" @bind:event="oninput" @onkeyup="SearchCustomers"
+            placeholder="Search customers by name, email, or phone..."
+            class="flex-1 border-0 focus:ring-0 text-sm" />
+    </div>
+
+    @if (searchResults.Any() && !string.IsNullOrEmpty(searchQuery))
+    {
+        <div class="border-t border-gray-200 pt-3 max-h-64 overflow-y-auto">
+            @foreach (var customer in searchResults)
+            {
+                <div class="p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors mb-2"
+                    @onclick="() => SelectCustomer(customer)">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="font-medium text-gray-900">@customer.FirstName @customer.LastName</p>
+                            <p class="text-sm text-gray-600">@customer.Email</p>
+                        </div>
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (SelectedCustomer != null)
+    {
+        <div class="border-t border-gray-200 pt-4 mt-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Customer Profile</h3>
+                <button @onclick="ClearSelection" class="text-sm text-gray-500 hover:text-gray-700">
+                    Clear
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span class="text-lg font-semibold text-blue-600">
+                            @SelectedCustomer.FirstName[0]@SelectedCustomer.LastName[0]
+                        </span>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-900">@SelectedCustomer.FirstName @SelectedCustomer.LastName</p>
+                        <p class="text-sm text-gray-600">Customer ID: @SelectedCustomer.Id</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                        <p class="text-gray-600">Email</p>
+                        <p class="font-medium text-gray-900">@SelectedCustomer.Email</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600">Phone</p>
+                        <p class="font-medium text-gray-900">@SelectedCustomer.Phone</p>
+                    </div>
+                </div>
+
+                <div class="flex space-x-2 pt-2">
+                    <button @onclick="() => OnCreateTicket.InvokeAsync(SelectedCustomer)"
+                        class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
+                        Create Ticket
+                    </button>
+                    <button @onclick="() => OnLogCall.InvokeAsync(SelectedCustomer)"
+                        class="flex-1 px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors">
+                        Log Call
+                    </button>
+                    <button @onclick="() => OnPlaceOrder.InvokeAsync(SelectedCustomer)"
+                        class="flex-1 px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors">
+                        Place Order
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Customer? SelectedCustomer { get; set; }
+    [Parameter] public EventCallback<Customer> OnCustomerSelected { get; set; }
+    [Parameter] public EventCallback<Customer> OnCreateTicket { get; set; }
+    [Parameter] public EventCallback<Customer> OnLogCall { get; set; }
+    [Parameter] public EventCallback<Customer> OnPlaceOrder { get; set; }
+
+    private string searchQuery = "";
+    private List<Customer> searchResults = new();
+    private List<Customer> allCustomers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var customers = await ApiClient.GetCustomersAsync();
+        allCustomers = customers ?? new List<Customer>();
+    }
+
+    private void SearchCustomers()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            searchResults.Clear();
+            return;
+        }
+
+        var query = searchQuery.ToLower();
+        searchResults = allCustomers
+            .Where(c =>
+                c.FirstName.ToLower().Contains(query) ||
+                c.LastName.ToLower().Contains(query) ||
+                c.Email.ToLower().Contains(query) ||
+                c.Phone.Contains(query))
+            .Take(5)
+            .ToList();
+    }
+
+    private async Task SelectCustomer(Customer customer)
+    {
+        SelectedCustomer = customer;
+        await OnCustomerSelected.InvokeAsync(customer);
+        searchQuery = "";
+        searchResults.Clear();
+    }
+
+    private void ClearSelection()
+    {
+        SelectedCustomer = null;
+    }
+}

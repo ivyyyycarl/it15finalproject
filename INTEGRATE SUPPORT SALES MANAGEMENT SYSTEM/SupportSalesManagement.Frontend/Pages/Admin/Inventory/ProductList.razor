@@ -1,0 +1,398 @@
+@page "/admin/products"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<PageTitle>Admin - Product Management</PageTitle>
+
+<div class="px-6 py-8">
+    <div class="mb-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Items / Products</h1>
+            <p class="mt-1 text-sm text-gray-500">Manage your product inventory and catalog</p>
+        </div>
+        <div class="flex space-x-3">
+            <button @onclick='() => NavigationManager.NavigateTo("/admin/products/new")'
+                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow-sm flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                Add New Item
+            </button>
+        </div>
+    </div>
+
+    <!-- Search/Filter -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div class="md:col-span-2">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
+                    <input type="text" value="@searchTerm" @oninput="OnSearchInput"
+                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                        placeholder="Search by name, SKU, or category..." />
+                </div>
+            </div>
+            <div>
+                 <select @bind="selectedCategory" @bind:after="FilterProducts"
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">All Categories</option>
+                    @foreach (var cat in categories)
+                    {
+                        <option value="@cat">@cat</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <select @bind="stockFilter" @bind:after="FilterProducts"
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="all">All Stock Status</option>
+                    <option value="low">Low Stock (≤10)</option>
+                    <option value="out">Out of Stock</option>
+                </select>
+            </div>
+            <div>
+                <select @bind="activeFilter" @bind:after="FilterProducts"
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="active">Active Only</option>
+                    <option value="archived">Archived Only</option>
+                    <option value="all">All Status</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        @if (isLoading)
+        {
+            <div class="p-12 flex justify-center">
+                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+            </div>
+        }
+        else if (filteredProducts.Count == 0)
+        {
+            <div class="p-12 text-center text-gray-500">
+                <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                <p>No products found matching your search.</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("name")' class="inline-flex items-center gap-1 hover:text-blue-600">
+                                    Product Info <span class="text-[10px]">@GetSortIndicator("name")</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("category")' class="inline-flex items-center gap-1 hover:text-blue-600">
+                                    Category <span class="text-[10px]">@GetSortIndicator("category")</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("price")' class="inline-flex items-center gap-1 hover:text-blue-600">
+                                    Price <span class="text-[10px]">@GetSortIndicator("price")</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("stock")' class="inline-flex items-center gap-1 hover:text-blue-600">
+                                    Stock <span class="text-[10px]">@GetSortIndicator("stock")</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Status</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @foreach (var product in filteredProducts)
+                        {
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500">
+                                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                        </div>
+                                        <div class="ml-4">
+                                            <div class="text-sm font-medium text-gray-900">@product.Name</div>
+                                            <div class="text-sm text-gray-500">SKU: @product.SKU</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                        @product.Category
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    ₱@product.Price.ToString("N2")
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <span class="text-sm font-medium @GetStockColor(product.StockQuantity)">
+                                            @product.StockQuantity
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if (product.StockQuantity == 0)
+                                    {
+                                        <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Out of Stock</span>
+                                    }
+                                    else if (product.StockQuantity <= 10)
+                                    {
+                                        <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">Low Stock</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">In Stock</span>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if (product.IsActive)
+                                    {
+                                        <span class="px-2 text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="px-2 text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Inactive</span>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div class="flex justify-end space-x-2">
+                                        <button @onclick="() => EditProduct(product.Id)" class="text-blue-600 hover:text-blue-900" title="Edit">
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                        </button>
+                                        <button @onclick="() => ArchiveProduct(product)" class="text-yellow-600 hover:text-yellow-900" title="@(product.IsActive ? "Archive" : "Activate")">
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                <p class="text-sm text-gray-500">Showing @(filteredProducts.Any() ? (((currentPage - 1) * pageSize) + 1) : 0)-@Math.Min(currentPage * pageSize, totalProductCount) of @totalProductCount products · Page @currentPage/@totalPages</p>
+                <div class="flex items-center gap-2">
+                    <button @onclick="PreviousPage" disabled="@(currentPage <= 1)"
+                        class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        Previous
+                    </button>
+                    <button @onclick="NextPage" disabled="@(currentPage >= totalPages)"
+                        class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        Next
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Product> products = new();
+    private List<Product> filteredProducts = new();
+    private List<string> categories = new();
+    private bool isLoading = true;
+
+    // Filters
+    private string searchTerm = "";
+    private string selectedCategory = "";
+    private string stockFilter = "all";
+    private string activeFilter = "active";
+    private int currentPage = 1;
+    private int pageSize = 25;
+    private int totalPages = 1;
+    private int totalProductCount = 0;
+    private string sortBy = "name";
+    private string sortDir = "asc";
+    private CancellationTokenSource? _searchDebounceCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            bool? isActiveParam = activeFilter switch {
+                "active" => true,
+                "archived" => false,
+                _ => null
+            };
+
+            var result = await ApiClient.GetProductsPagedAsync(
+                currentPage,
+                pageSize,
+                searchTerm,
+                string.IsNullOrWhiteSpace(selectedCategory) ? null : selectedCategory,
+                isActiveParam,
+                false,
+                stockFilter == "all" ? null : stockFilter,
+                sortBy,
+                sortDir);
+            if (result != null)
+            {
+                products = result.Items;
+                categories = products.Select(p => p.Category).Distinct().OrderBy(c => c).ToList();
+                filteredProducts = products;
+                totalProductCount = result.TotalCount;
+                totalPages = Math.Max(1, result.TotalPages);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading products: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task FilterProducts()
+    {
+        currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task SetSort(string field)
+    {
+        if (string.Equals(sortBy, field, StringComparison.OrdinalIgnoreCase))
+        {
+            sortDir = sortDir == "asc" ? "desc" : "asc";
+        }
+        else
+        {
+            sortBy = field;
+            sortDir = "asc";
+        }
+
+        await FilterProducts();
+    }
+
+    private string GetSortIndicator(string field)
+    {
+        if (!string.Equals(sortBy, field, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return sortDir == "asc" ? "ASC" : "DESC";
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? string.Empty;
+        await DebouncedFilterProductsAsync();
+    }
+
+    private async Task DebouncedFilterProductsAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (token.IsCancellationRequested) return;
+            await FilterProducts();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private async Task PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+        await LoadData();
+    }
+
+    private async Task NextPage()
+    {
+        if (currentPage >= totalPages) return;
+        currentPage++;
+        await LoadData();
+    }
+
+    private string GetStockColor(int quantity)
+    {
+        if (quantity == 0) return "text-red-600 font-bold";
+        if (quantity <= 10) return "text-orange-600 font-bold";
+        return "text-gray-900";
+    }
+
+    private void EditProduct(int id)
+    {
+        NavigationManager.NavigateTo($"/admin/products/edit/{id}");
+    }
+
+    private async Task ArchiveProduct(Product product)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", new object[] { $"Are you sure you want to {(product.IsActive ? "archive" : "activate")} this product?" }))
+            return;
+
+        var request = new UpdateProductRequest 
+        { 
+            Name = product.Name,
+            Description = product.Description,
+            Category = product.Category,
+            Price = product.Price,
+            StockQuantity = product.StockQuantity,
+            IsActive = !product.IsActive // Toggle status
+        };
+
+        var result = await ApiClient.UpdateProductAsync(product.Id, request);
+        if (result.Product != null)
+        {
+            await LoadData();
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Failed to update product: {result.Error}");
+        }
+    }
+
+    private async Task DeleteProduct(Product product)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", new object[] { $"Are you sure you want to delete {product.Name}? This cannot be undone." }))
+            return;
+
+        var success = await ApiClient.DeleteProductAsync(product.Id);
+        if (success)
+        {
+            await LoadData();
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Failed to delete product.");
+        }
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+    }
+}

@@ -1,0 +1,464 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject SupportSalesManagement.Frontend.Services.AuthenticationService AuthService
+@inject SupportSalesManagement.Frontend.Services.NotificationService NotificationService
+@inject SupportSalesManagement.Frontend.Services.ApiClient ApiClient
+@using SupportSalesManagement.Frontend.Models
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@implements IDisposable
+
+<div class="min-h-screen bg-gray-50 flex">
+    <!-- Sidebar -->
+    <aside
+        class="w-72 bg-[#1E1E2D] text-white flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 shadow-2xl border-r border-white/5">
+
+        <!-- Brand Header -->
+        <div class="h-20 flex items-center px-6 border-b border-white/10 relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-red-900/20 to-transparent"></div>
+            <div class="flex items-center gap-3 relative z-10">
+                <div
+                    class="w-10 h-10 bg-gradient-to-br from-red-500 to-red-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-red-600/30 ring-2 ring-red-400/20">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-bold text-lg tracking-wide text-white leading-none">ClassicFit</span>
+                    <span class="text-[10px] uppercase tracking-[0.2em] font-bold text-red-400 mt-0.5">Super Admin</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Menu -->
+        <nav class="flex-1 overflow-y-auto py-6 space-y-1">
+            <div class="px-6 mb-2">
+                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Main Menu</span>
+            </div>
+
+            <NavLink href="/superadmin/dashboard" Match="NavLinkMatch.All"
+                class="group flex items-center px-4 py-3 mx-2 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white"
+                ActiveClass="bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30">
+                <div class="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                </div>
+                <span class="ml-3 font-medium">Dashboard</span>
+            </NavLink>
+
+            <NavLink href="/superadmin/users"
+                class="group flex items-center px-4 py-3 mx-2 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white"
+                ActiveClass="bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30">
+                <div class="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                </div>
+                <span class="ml-3 font-medium">User Management</span>
+            </NavLink>
+
+            <div class="px-6 mt-8 mb-2">
+                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">System</span>
+            </div>
+
+            <NavLink href="/superadmin/my-profile"
+                class="group flex items-center px-4 py-3 mx-2 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white"
+                ActiveClass="bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30">
+                <div class="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M5.121 17.804A8.97 8.97 0 0112 15c2.58 0 4.906 1.09 6.555 2.833M15 11a3 3 0 11-6 0 3 3 0 016 0zM12 2a10 10 0 100 20 10 10 0 000-20z" />
+                    </svg>
+                </div>
+                <span class="ml-3 font-medium">My Profile</span>
+            </NavLink>
+
+            <NavLink href="/superadmin/module-management"
+                class="group flex items-center px-4 py-3 mx-2 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white"
+                ActiveClass="bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30">
+                <div class="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 6h16M4 12h16M4 18h7" />
+                    </svg>
+                </div>
+                <span class="ml-3 font-medium">Module Management</span>
+            </NavLink>
+
+            <NavLink href="/superadmin/governance"
+                class="group flex items-center px-4 py-3 mx-2 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white"
+                ActiveClass="bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30">
+                <div class="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 17v-2a4 4 0 014-4h4m0 0l-2-2m2 2l-2 2M5 7h14M5 12h5m-5 5h5" />
+                    </svg>
+                </div>
+                <span class="ml-3 font-medium">Subscription & Branching</span>
+            </NavLink>
+
+            <NavLink href="/superadmin/audit"
+                class="group flex items-center px-4 py-3 mx-2 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white"
+                ActiveClass="bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30">
+                <div class="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <span class="ml-3 font-medium">Audit Logs</span>
+            </NavLink>
+
+            <NavLink href="/superadmin/reports/financial"
+                class="group flex items-center px-4 py-3 mx-2 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white"
+                ActiveClass="bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30">
+                <div class="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+                <span class="ml-3 font-medium">Reports</span>
+            </NavLink>
+
+            <NavLink href="/superadmin/notifications/alerts"
+                class="group flex items-center px-4 py-3 mx-2 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white"
+                ActiveClass="bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30">
+                <div class="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                </div>
+                <span class="ml-3 font-medium">Notifications</span>
+            </NavLink>
+
+            <button type="button" @onclick="Logout"
+                class="group w-[calc(100%-1rem)] flex items-center px-4 py-3 mx-2 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white">
+                <div class="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                </div>
+                <span class="ml-3 font-medium">Logout</span>
+            </button>
+        </nav>
+
+        <!-- Profile Footer -->
+        <div class="p-4 border-t border-white/8 bg-[#171726]">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#60A5FA] p-0.5 shadow-lg shadow-blue-500/20 flex-shrink-0">
+                        <div class="w-full h-full rounded-[10px] bg-[#1E1E2D] flex items-center justify-center">
+                            <span class="text-xs font-bold text-blue-300 uppercase">
+                                @(AuthService.CurrentUser?.FirstName?.FirstOrDefault() ??
+                                    'S')@(AuthService.CurrentUser?.LastName?.FirstOrDefault() ?? 'A')
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-sm font-bold text-white truncate w-32">@(AuthService.CurrentUser?.FirstName ??
+                            "Super Admin")</p>
+                        <p class="text-[10px] text-gray-400 truncate w-32">Developer Mode</p>
+                        <p class="text-[10px] text-blue-300/80 truncate w-40">@currentBranchLabel</p>
+                    </div>
+                </div>
+                <div class="w-5 h-5"></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 flex flex-col min-h-screen ml-72 transition-all duration-300">
+
+        <!-- Top Bar -->
+        <header
+            class="h-16 bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-6 sticky top-0 z-40">
+
+            <div class="min-w-0">
+                <h1 class="text-lg font-bold text-gray-900 truncate leading-tight">@GetHeaderTitle()</h1>
+                <p class="text-xs text-gray-500 truncate">@GetHeaderSubtitle()</p>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <span class="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                    @currentBranchLabel
+                </span>
+                <div
+                    class="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-full text-xs font-bold border border-red-100">
+                    <div class="w-2 h-2 rounded-full bg-red-600 animate-pulse"></div>
+                    Super Admin Console
+                </div>
+
+                <!-- Notification Bell -->
+                <div class="relative">
+                    <button @onclick="ToggleNotifications"
+                        class="relative p-2 text-gray-500 hover:text-[#3B82F6] hover:bg-blue-50 rounded-lg transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        @if (unreadCount > 0)
+                        {
+                            <span
+                                class="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-white text-[10px] font-bold text-white flex items-center justify-center px-1">@unreadCount</span>
+                        }
+                    </button>
+
+                    <!-- Notification Dropdown -->
+                    @if (showNotifications)
+                    {
+                        <div class="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 z-50"
+                            @onclick:stopPropagation="true">
+                            <!-- Header -->
+                            <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                                <h3 class="text-lg font-bold text-gray-900">Notifications</h3>
+                                @if (unreadCount > 0)
+                                {
+                                    <button @onclick="MarkAllAsRead"
+                                        class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                                        Mark all as read
+                                    </button>
+                                }
+                            </div>
+
+                            <!-- Notification List -->
+                            <div class="max-h-96 overflow-y-auto">
+                                @if (notifications.Any())
+                                {
+                                    @foreach (var notification in notifications)
+                                    {
+                                        <div @onclick="() => MarkAsRead(notification.Id)"
+                                            class="@(notification.IsRead ? "bg-white" : "bg-blue-50") p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors">
+                                            <div class="flex items-start gap-3">
+                                                <!-- Icon -->
+                                                <div class="flex-shrink-0 mt-0.5">
+                                                    @switch (notification.Type)
+                                                    {
+                                                        case NotificationType.Success:
+                                                            <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                            </div>
+                                                            break;
+                                                        case NotificationType.Warning:
+                                                            <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                                                                <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                                </svg>
+                                                            </div>
+                                                            break;
+                                                        case NotificationType.Error:
+                                                            <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                                                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                            </div>
+                                                            break;
+                                                        default:
+                                                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                            </div>
+                                                            break;
+                                                    }
+                                                </div>
+
+                                                <!-- Content -->
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex items-start justify-between gap-2">
+                                                        <p class="text-sm font-semibold text-gray-900">@notification.Title</p>
+                                                        @if (!notification.IsRead)
+                                                        {
+                                                            <div class="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 mt-1.5"></div>
+                                                        }
+                                                    </div>
+                                                    <p class="text-xs text-gray-600 mt-1">@notification.Message</p>
+                                                    <p class="text-xs text-gray-400 mt-2">@GetTimeAgo(notification.CreatedAt)</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="p-8 text-center">
+                                        <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                        </svg>
+                                        <p class="text-sm text-gray-500">No notifications</p>
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Footer -->
+                            @if (notifications.Any())
+                            {
+                                <div class="p-3 border-t border-gray-200 text-center">
+                                    <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                        View all notifications
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <main class="flex-1 p-6 overflow-x-hidden bg-gradient-to-br from-gray-50 via-gray-50 to-blue-50/30">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    private bool showNotifications = false;
+    private List<Notification> notifications = new();
+    private int unreadCount = 0;
+    private string currentBranchLabel = "Branch: Global";
+    
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentBranchLabel = await ResolveBranchLabelAsync(AuthService.CurrentUser);
+        LoadNotifications();
+        NotificationService.OnNotificationsChanged += OnNotificationChanged;
+    }
+
+    private async Task<string> ResolveBranchLabelAsync(User? user)
+    {
+        if (user is null || user.BranchId is null || user.BranchId <= 0)
+        {
+            return "Branch: Global";
+        }
+
+        var branchName = string.IsNullOrWhiteSpace(user.BranchName) ? null : user.BranchName.Trim();
+        if (branchName is null)
+        {
+            try
+            {
+                var users = await ApiClient.GetUsersAsync();
+                branchName = users?.FirstOrDefault(u => u.Id == user.Id)?.BranchName?.Trim();
+            }
+            catch
+            {
+            }
+        }
+
+        if (branchName is null)
+        {
+            try
+            {
+                var branches = await ApiClient.GetBranchesAsync();
+                branchName = branches?.FirstOrDefault(b => b.Id == user.BranchId.Value)?.Name?.Trim();
+            }
+            catch
+            {
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(branchName) ? "Branch: Unassigned" : $"Branch: {branchName}";
+    }
+
+    private void LoadNotifications()
+    {
+        notifications = NotificationService.GetNotifications();
+        unreadCount = NotificationService.GetUnreadCount();
+    }
+
+    private void OnNotificationChanged()
+    {
+        LoadNotifications();
+        StateHasChanged();
+    }
+
+    private void ToggleNotifications()
+    {
+        showNotifications = !showNotifications;
+        if (!showNotifications)
+        {
+            LoadNotifications();
+        }
+    }
+
+    private void MarkAsRead(int notificationId)
+    {
+        NotificationService.MarkAsRead(notificationId);
+    }
+
+    private void MarkAllAsRead()
+    {
+        NotificationService.MarkAllAsRead();
+    }
+
+    private string GetTimeAgo(DateTime dateTime)
+    {
+        var timeSpan = DateTime.Now - dateTime;
+
+        if (timeSpan.TotalMinutes < 1)
+            return "Just now";
+        if (timeSpan.TotalMinutes < 60)
+            return $"{(int)timeSpan.TotalMinutes}m ago";
+        if (timeSpan.TotalHours < 24)
+            return $"{(int)timeSpan.TotalHours}h ago";
+        if (timeSpan.TotalDays < 7)
+            return $"{(int)timeSpan.TotalDays}d ago";
+        
+        return dateTime.ToString("MMM dd");
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+    }
+
+    private string GetHeaderTitle()
+    {
+        var path = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?')[0].Trim('/').ToLowerInvariant();
+        return path switch
+        {
+            "/superadmin/dashboard" => "System Operations Center",
+            "/superadmin/users" => "User Management",
+            "/superadmin/module-management" => "Module Management",
+            "/superadmin/governance" => "Subscription & Branching",
+            "/superadmin/my-profile" => "My Profile",
+            "/superadmin/audit" => "Audit Logs",
+            "/superadmin/reports/financial" => "Reports",
+            "/superadmin/notifications/alerts" => "Notifications",
+            _ => "Super Admin Console"
+        };
+    }
+
+    private string GetHeaderSubtitle()
+    {
+        var path = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?')[0].Trim('/').ToLowerInvariant();
+        return path switch
+        {
+            "/superadmin/dashboard" => "Real-time global overview of ClassicFit infrastructure",
+            "/superadmin/users" => "Manage admin, supervisor, agent, and customer accounts",
+            "/superadmin/module-management" => "Control actor access and module activation",
+            "/superadmin/governance" => "Manage subscription plans and branch governance",
+            "/superadmin/my-profile" => "Account details and governance activity",
+            "/superadmin/audit" => "View security and governance activity logs",
+            "/superadmin/reports/financial" => "Review financial performance and billing insights",
+            "/superadmin/notifications/alerts" => "Track system alerts and announcements",
+            _ => "Global administration workspace"
+        };
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnNotificationsChanged -= OnNotificationChanged;
+    }
+}

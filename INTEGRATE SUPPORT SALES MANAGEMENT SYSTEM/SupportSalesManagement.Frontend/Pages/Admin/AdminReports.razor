@@ -1,0 +1,507 @@
+@page "/admin/reports"
+@page "/admin/reports/sales"
+@page "/admin/reports/tickets"
+@page "/admin/reports/inventory"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<PageTitle>Analytics & Reports - Admin</PageTitle>
+
+<div class="px-6 py-8">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Analytics & Reports</h1>
+            <p class="text-sm text-gray-500 mt-1">Monitor system performance and business metrics</p>
+        </div>
+        <div class="flex gap-3">
+            <button
+                @onclick="ExportToPdf"
+                class="bg-white border border-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export to PDF
+            </button>
+            <button
+                @onclick="PrintReport"
+                class="bg-white border border-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print Report
+            </button>
+            <select @onchange="OnDateRangeChanged"
+                class="bg-white border border-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg shadow-sm outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="30">Last 30 Days</option>
+                <option value="7">Last 7 Days</option>
+                <option value="90">This Quarter</option>
+                <option value="365">Year to Date</option>
+                <option value="0">All Time</option>
+            </select>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex items-center justify-center py-24">
+            <div class="flex flex-col items-center">
+                <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p class="text-gray-500">Loading report data...</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- View Tabs -->
+        <div class="flex items-center gap-6 border-b border-gray-200 mb-8">
+            <button
+                class="pb-3 px-1 font-bold text-sm transition-all relative @(ActiveTab == "Sales" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")"
+                @onclick='() => SetTab("Sales")'>
+                Sales Performance
+                @if (ActiveTab == "Sales")
+                {
+                    <span
+                        class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>
+                }
+            </button>
+            <button
+                class="pb-3 px-1 font-bold text-sm transition-all relative @(ActiveTab == "Tickets" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")"
+                @onclick='() => SetTab("Tickets")'>
+                Support Analytics
+                @if (ActiveTab == "Tickets")
+                {
+                    <span
+                        class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>
+                }
+            </button>
+            <button
+                class="pb-3 px-1 font-bold text-sm transition-all relative @(ActiveTab == "Inventory" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")"
+                @onclick='() => SetTab("Inventory")'>
+                Inventory Reports
+                @if (ActiveTab == "Inventory")
+                {
+                    <span
+                        class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>
+                }
+            </button>
+        </div>
+
+        @if (ActiveTab == "Sales")
+        {
+            <!-- Sales Content -->
+            <div class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm font-medium text-gray-500">Total Revenue</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">@($"₱{totalRevenue:N2}")</p>
+                        <p class="text-xs text-green-600 mt-1 flex items-center">
+                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            @orderCount orders
+                        </p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm font-medium text-gray-500">Average Order Value</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">@($"₱{averageOrderValue:N2}")</p>
+                        <p class="text-xs text-gray-600 mt-1 flex items-center">
+                            Based on @orderCount orders
+                        </p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm font-medium text-gray-500">Total Orders</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">@orderCount</p>
+                        <p class="text-xs text-gray-600 mt-1 flex items-center">
+                            All time orders
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                        <h3 class="font-bold text-gray-900">Recent Orders</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Order #</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Customer</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @if (recentOrders.Any())
+                                {
+                                    @foreach (var order in pagedSalesOrders)
+                                    {
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">@order.OrderNumber</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@order.CustomerName</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@order.OrderDate.ToString("MMM dd, yyyy")</td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full @GetStatusClass(order.Status)">@order.Status</span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">@($"₱{order.TotalAmount:N2}")</td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">No orders found</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (recentOrders.Any())
+                    {
+                        <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                            <span class="text-sm text-gray-500">Showing @(((salesCurrentPage - 1) * tablePageSize) + 1)-@Math.Min(salesCurrentPage * tablePageSize, recentOrders.Count) of @recentOrders.Count · Page @salesCurrentPage/@salesTotalPages</span>
+                            <div class="flex items-center gap-2">
+                                <button type="button" @onclick="PreviousSalesPage" disabled="@(salesCurrentPage <= 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                                <button type="button" @onclick="NextSalesPage" disabled="@(salesCurrentPage >= salesTotalPages)" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else if (ActiveTab == "Tickets")
+        {
+            <!-- Tickets Content -->
+            <div class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm font-medium text-gray-500">Open Tickets</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-2">@openTickets</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm font-medium text-gray-500">Resolution Rate</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-2">@($"{resolutionRate:P1}")</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm font-medium text-gray-500">Escalated Tickets</p>
+                        <p class="text-2xl font-bold text-red-600 mt-2">@escalatedTickets</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm font-medium text-gray-500">Total Tickets</p>
+                        <p class="text-2xl font-bold text-blue-600 mt-2">@totalTickets</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                        <h3 class="font-bold text-gray-900">Ticket Status Breakdown</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="text-center p-4 bg-blue-50 rounded-lg">
+                                <p class="text-2xl font-bold text-blue-600">@openTickets</p>
+                                <p class="text-sm text-gray-600 mt-1">Open</p>
+                            </div>
+                            <div class="text-center p-4 bg-purple-50 rounded-lg">
+                                <p class="text-2xl font-bold text-purple-600">@inProgressTickets</p>
+                                <p class="text-sm text-gray-600 mt-1">In Progress</p>
+                            </div>
+                            <div class="text-center p-4 bg-green-50 rounded-lg">
+                                <p class="text-2xl font-bold text-green-600">@resolvedTickets</p>
+                                <p class="text-sm text-gray-600 mt-1">Resolved</p>
+                            </div>
+                            <div class="text-center p-4 bg-gray-50 rounded-lg">
+                                <p class="text-2xl font-bold text-gray-600">@closedTickets</p>
+                                <p class="text-sm text-gray-600 mt-1">Closed</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (ActiveTab == "Inventory")
+        {
+            <!-- Inventory Content -->
+            <div class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm font-medium text-gray-500">Total SKU Count</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-2">@productCount</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm font-medium text-gray-500">Out of Stock Items</p>
+                        <p class="text-2xl font-bold text-red-500 mt-2">@outOfStockCount</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm font-medium text-gray-500">Inventory Value</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-2">@($"₱{inventoryValue:N2}")</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                        <h3 class="font-bold text-gray-900">Low Stock Alert</h3>
+                    </div>
+                    <div class="p-6">
+                        @if (lowStockProducts.Any())
+                        {
+                            <div class="space-y-2">
+                                @foreach (var product in pagedLowStockProducts)
+                                {
+                                    <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
+                                        <div>
+                                            <p class="font-medium text-gray-900">@product.Name</p>
+                                            <p class="text-sm text-gray-500">SKU: @product.SKU</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-sm font-bold text-red-600">@product.StockQuantity units</p>
+                                            <p class="text-xs text-gray-500">Stock Level</p>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            <div class="mt-4 flex items-center justify-between">
+                                <span class="text-sm text-gray-500">Showing @(((inventoryCurrentPage - 1) * tablePageSize) + 1)-@Math.Min(inventoryCurrentPage * tablePageSize, lowStockProducts.Count) of @lowStockProducts.Count · Page @inventoryCurrentPage/@inventoryTotalPages</span>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" @onclick="PreviousInventoryPage" disabled="@(inventoryCurrentPage <= 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                                    <button type="button" @onclick="NextInventoryPage" disabled="@(inventoryCurrentPage >= inventoryTotalPages)" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-center text-gray-500 py-8">No low stock items</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private string ActiveTab = "Sales";
+    private bool isLoading = true;
+    private int dateRangeDays = 30;
+
+    private List<Order> allOrders = new();
+    private List<Ticket> allTickets = new();
+    private List<Product> allProducts = new();
+    
+    // Sales data
+    private decimal totalRevenue = 0;
+    private decimal averageOrderValue = 0;
+    private int orderCount = 0;
+    private List<Order> recentOrders = new();
+    
+    // Tickets data
+    private int totalTickets = 0;
+    private int openTickets = 0;
+    private int inProgressTickets = 0;
+    private int resolvedTickets = 0;
+    private int closedTickets = 0;
+    private int escalatedTickets = 0;
+    private decimal resolutionRate = 0;
+    
+    // Inventory data
+    private int productCount = 0;
+    private int outOfStockCount = 0;
+    private decimal inventoryValue = 0;
+    private List<Product> lowStockProducts = new();
+    private int salesCurrentPage = 1;
+    private int inventoryCurrentPage = 1;
+    private const int tablePageSize = 10;
+    private int salesTotalPages => Math.Max(1, (int)Math.Ceiling(recentOrders.Count / (double)tablePageSize));
+    private int inventoryTotalPages => Math.Max(1, (int)Math.Ceiling(lowStockProducts.Count / (double)tablePageSize));
+    private List<Order> pagedSalesOrders => recentOrders.Skip((salesCurrentPage - 1) * tablePageSize).Take(tablePageSize).ToList();
+    private List<Product> pagedLowStockProducts => lowStockProducts.Skip((inventoryCurrentPage - 1) * tablePageSize).Take(tablePageSize).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        UpdateTabFromUrl();
+        await LoadData();
+    }
+
+    protected override void OnParametersSet()
+    {
+        UpdateTabFromUrl();
+    }
+
+    private void UpdateTabFromUrl()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).ToLower();
+
+        if (relativePath.Contains("tickets"))
+        {
+            SetTab("Tickets", false);
+        }
+        else if (relativePath.Contains("inventory"))
+        {
+            SetTab("Inventory", false);
+        }
+        else
+        {
+            if (ActiveTab != "Sales") SetTab("Sales", false);
+        }
+    }
+
+    private void SetTab(string tab, bool updateUrl = true)
+    {
+        ActiveTab = tab;
+        salesCurrentPage = 1;
+        inventoryCurrentPage = 1;
+        if (updateUrl)
+        {
+            if (tab == "Sales") NavigationManager.NavigateTo("/admin/reports/sales");
+            else if (tab == "Tickets") NavigationManager.NavigateTo("/admin/reports/tickets");
+            else if (tab == "Inventory") NavigationManager.NavigateTo("/admin/reports/inventory");
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var ordersTask = ApiClient.GetOrdersAsync();
+            var ticketsTask = ApiClient.GetTicketsAsync();
+            var productsTask = ApiClient.GetProductsAsync();
+
+            await Task.WhenAll(ordersTask, ticketsTask, productsTask);
+
+            allOrders = await ordersTask ?? new List<Order>();
+            allTickets = await ticketsTask ?? new List<Ticket>();
+            allProducts = await productsTask ?? new List<Product>();
+
+            ApplyDateFilter();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading report data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ApplyDateFilter()
+    {
+        var cutoffDate = dateRangeDays > 0 ? DateTime.Now.AddDays(-dateRangeDays) : DateTime.MinValue;
+
+        var orders = dateRangeDays > 0 
+            ? allOrders.Where(o => o.OrderDate >= cutoffDate || o.CreatedAt >= cutoffDate).ToList() 
+            : allOrders;
+        var tickets = dateRangeDays > 0 
+            ? allTickets.Where(t => t.CreatedAt >= cutoffDate).ToList() 
+            : allTickets;
+        var products = allProducts;
+
+        orderCount = orders.Count;
+        totalRevenue = orders.Sum(o => o.TotalAmount);
+        averageOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
+        recentOrders = orders.OrderByDescending(o => o.OrderDate).ToList();
+
+        totalTickets = tickets.Count;
+        openTickets = tickets.Count(t => t.Status.Equals("Open", StringComparison.OrdinalIgnoreCase) || t.Status.Equals("New", StringComparison.OrdinalIgnoreCase));
+        inProgressTickets = tickets.Count(t => t.Status.Equals("InProgress", StringComparison.OrdinalIgnoreCase) || t.Status.Equals("In Progress", StringComparison.OrdinalIgnoreCase));
+        resolvedTickets = tickets.Count(t => t.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase));
+        closedTickets = tickets.Count(t => t.Status.Equals("Closed", StringComparison.OrdinalIgnoreCase));
+        escalatedTickets = tickets.Count(t => t.Status.Equals("Escalated", StringComparison.OrdinalIgnoreCase) || 
+            t.Priority.Equals("High", StringComparison.OrdinalIgnoreCase) || 
+            t.Priority.Equals("Critical", StringComparison.OrdinalIgnoreCase));
+        
+        resolutionRate = totalTickets > 0 ? (decimal)(resolvedTickets + closedTickets) / totalTickets : 0;
+
+        productCount = products.Count;
+        outOfStockCount = products.Count(p => p.StockQuantity <= 0);
+        inventoryValue = products.Sum(p => p.Price * p.StockQuantity);
+        lowStockProducts = products.Where(p => p.StockQuantity > 0 && p.StockQuantity <= 10)
+            .OrderBy(p => p.StockQuantity)
+            .ToList();
+        salesCurrentPage = 1;
+        inventoryCurrentPage = 1;
+    }
+
+    private void OnDateRangeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var days))
+        {
+            dateRangeDays = days;
+            ApplyDateFilter();
+            StateHasChanged();
+        }
+    }
+
+    private void PreviousSalesPage()
+    {
+        if (salesCurrentPage <= 1) return;
+        salesCurrentPage--;
+    }
+
+    private void NextSalesPage()
+    {
+        if (salesCurrentPage >= salesTotalPages) return;
+        salesCurrentPage++;
+    }
+
+    private void PreviousInventoryPage()
+    {
+        if (inventoryCurrentPage <= 1) return;
+        inventoryCurrentPage--;
+    }
+
+    private void NextInventoryPage()
+    {
+        if (inventoryCurrentPage >= inventoryTotalPages) return;
+        inventoryCurrentPage++;
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "pending" => "bg-yellow-100 text-yellow-800",
+            "processing" => "bg-blue-100 text-blue-800",
+            "completed" => "bg-green-100 text-green-800",
+            "cancelled" => "bg-red-100 text-red-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private async Task ExportToPdf()
+    {
+        var reportTitle = ActiveTab switch
+        {
+            "Sales" => "Sales Performance Report",
+            "Tickets" => "Support Analytics Report",
+            "Inventory" => "Inventory Reports",
+            _ => "Admin Report"
+        };
+        await JSRuntime.InvokeVoidAsync("exportToPdf", reportTitle);
+    }
+
+    private async Task PrintReport()
+    {
+        var reportTitle = ActiveTab switch
+        {
+            "Sales" => "Sales Performance Report",
+            "Tickets" => "Support Analytics Report",
+            "Inventory" => "Inventory Reports",
+            _ => "Admin Report"
+        };
+        await JSRuntime.InvokeVoidAsync("printCurrentPage", reportTitle);
+    }
+}

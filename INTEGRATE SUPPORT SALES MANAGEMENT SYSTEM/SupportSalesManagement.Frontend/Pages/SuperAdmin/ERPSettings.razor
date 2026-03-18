@@ -1,0 +1,158 @@
+@page "/superadmin/settings"
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject SupportSalesManagement.Frontend.Services.ApiClient ApiClient
+@using SupportSalesManagement.Frontend.Models
+
+<PageTitle>System Overview - Super Admin</PageTitle>
+
+<div class="space-y-4">
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">System Overview</h1>
+        <p class="mt-1 text-sm text-gray-500">Real-time system statistics and data overview.</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex justify-center items-center py-12">
+            <div class="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+    }
+    else
+    {
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div class="bg-gradient-to-b from-blue-50 to-white p-4 rounded-xl shadow-sm border border-blue-100 ui-uniform-card">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Users</p>
+                <p class="text-2xl font-bold text-gray-900 mt-2">@totalUsers</p>
+            </div>
+            <div class="bg-gradient-to-b from-amber-50 to-white p-4 rounded-xl shadow-sm border border-amber-100 ui-uniform-card">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Products</p>
+                <p class="text-2xl font-bold text-amber-700 mt-2">@totalProducts</p>
+            </div>
+            <div class="bg-gradient-to-b from-emerald-50 to-white p-4 rounded-xl shadow-sm border border-emerald-100 ui-uniform-card">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</p>
+                <p class="text-2xl font-bold text-emerald-700 mt-2">@totalOrders</p>
+            </div>
+            <div class="bg-gradient-to-b from-violet-50 to-white p-4 rounded-xl shadow-sm border border-violet-100 ui-uniform-card">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Tickets</p>
+                <p class="text-2xl font-bold text-violet-700 mt-2">@totalTickets</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+            <div class="bg-white shadow-sm rounded-xl border border-gray-100">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-lg font-medium text-gray-900">Users by Role</h2>
+                </div>
+                <div class="p-6 space-y-3">
+                    @foreach (var role in usersByRole)
+                    {
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-gray-700">@role.Key</span>
+                            <span class="text-sm font-bold text-gray-900">@role.Value</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="bg-white shadow-sm rounded-xl border border-gray-100">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-lg font-medium text-gray-900">Orders by Status</h2>
+                </div>
+                <div class="p-6 space-y-3">
+                    @foreach (var status in ordersByStatus)
+                    {
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-gray-700">@status.Key</span>
+                            <span class="text-sm font-bold text-gray-900">@status.Value</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div class="bg-white shadow-sm rounded-xl border border-gray-100">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-lg font-medium text-gray-900">Products by Category</h2>
+                </div>
+                <div class="p-6 space-y-3">
+                    @foreach (var cat in productsByCategory)
+                    {
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-gray-700">@cat.Key</span>
+                            <span class="text-sm font-bold text-gray-900">@cat.Value</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="bg-white shadow-sm rounded-xl border border-gray-100">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-lg font-medium text-gray-900">Tickets by Priority</h2>
+                </div>
+                <div class="p-6 space-y-3">
+                    @foreach (var priority in ticketsByPriority)
+                    {
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-gray-700">@priority.Key</span>
+                            <span class="text-sm font-bold text-gray-900">@priority.Value</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private int totalUsers, totalProducts, totalOrders, totalTickets;
+    private Dictionary<string, int> usersByRole = new();
+    private Dictionary<string, int> ordersByStatus = new();
+    private Dictionary<string, int> productsByCategory = new();
+    private Dictionary<string, int> ticketsByPriority = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var usersTask = ApiClient.GetSuperAdminUsersAsync();
+            var productsTask = ApiClient.GetProductsAsync();
+            var ordersTask = ApiClient.GetOrdersAsync();
+            var ticketsTask = ApiClient.GetTicketsAsync();
+
+            await Task.WhenAll(usersTask, productsTask, ordersTask, ticketsTask);
+
+            var users = await usersTask;
+            var products = await productsTask;
+            var orders = await ordersTask;
+            var tickets = await ticketsTask;
+
+            totalUsers = users?.Count ?? 0;
+            totalProducts = products?.Count ?? 0;
+            totalOrders = orders?.Count ?? 0;
+            totalTickets = tickets?.Count ?? 0;
+
+            if (users != null)
+                usersByRole = users.GroupBy(u => u.Role.ToString()).ToDictionary(g => g.Key, g => g.Count());
+
+            if (orders != null)
+                ordersByStatus = orders.GroupBy(o => o.Status ?? "Unknown").ToDictionary(g => g.Key, g => g.Count());
+
+            if (products != null)
+                productsByCategory = products.GroupBy(p => p.Category ?? "Uncategorized").ToDictionary(g => g.Key, g => g.Count());
+
+            if (tickets != null)
+                ticketsByPriority = tickets.GroupBy(t => t.Priority ?? "Normal").ToDictionary(g => g.Key, g => g.Count());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading system overview: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

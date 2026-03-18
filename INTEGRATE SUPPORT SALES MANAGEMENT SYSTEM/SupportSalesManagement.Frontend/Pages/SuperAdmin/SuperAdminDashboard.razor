@@ -1,0 +1,777 @@
+@page "/superadmin/dashboard"
+@using SupportSalesManagement.Frontend.Models
+@using Microsoft.JSInterop
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Super Admin Dashboard - System Operations</PageTitle>
+
+<style>
+    .sa-root {
+        --sa-primary: #DC2626; /* Red-600 for Super Admin / System feel */
+        --sa-secondary: #1F2937;
+        --sa-accent: #3B82F6;
+        --sa-bg: #F9FAFB;
+        --sa-card-bg: #FFFFFF;
+        --sa-border: #E5E7EB;
+        --sa-text-main: #111827;
+        --sa-text-muted: #6B7280;
+    }
+
+    /* Header */
+    /* Health Check Button */
+    .sa-health-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1.25rem;
+        background: white;
+        border: 1px solid var(--sa-border);
+        border-radius: 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--sa-secondary);
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .sa-health-btn:hover {
+        background: #F3F4F6;
+        border-color: #D1D5DB;
+    }
+    .sa-health-btn.is-checking {
+        background: #FEF2F2;
+        border-color: #F87171;
+        color: #DC2626;
+        animation: sa-pulse 2s infinite;
+    }
+    @@keyframes sa-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    /* Stats Grid */
+    .sa-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        align-items: stretch;
+        max-width: 100%;
+    }
+    @@media (max-width: 1100px) {
+        .sa-stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            max-width: none;
+        }
+    }
+    @@media (max-width: 700px) {
+        .sa-stats-grid { grid-template-columns: 1fr; }
+    }
+
+    .sa-stat-card {
+        background: var(--sa-card-bg);
+        border: 1px solid var(--card-border-color, var(--sa-border));
+        border-radius: var(--card-radius, 1rem);
+        padding: 1.15rem;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+        min-height: 146px;
+        height: 100%;
+        box-shadow: var(--card-shadow, 0 1px 4px rgba(0,0,0,.05));
+    }
+    .sa-stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--card-shadow-hover, 0 8px 18px rgba(0,0,0,.09));
+    }
+    .sa-stat-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        opacity: 0.9;
+    }
+    .sa-stat-card.tone-blue {
+        background: linear-gradient(180deg, #F8FBFF 0%, #FFFFFF 72%);
+    }
+    .sa-stat-card.tone-blue::before {
+        background: linear-gradient(90deg, #2563EB, #60A5FA);
+    }
+    .sa-stat-card.tone-red {
+        background: linear-gradient(180deg, #FFF8F8 0%, #FFFFFF 72%);
+    }
+    .sa-stat-card.tone-red::before {
+        background: linear-gradient(90deg, #DC2626, #FB7185);
+    }
+    .sa-stat-card.tone-violet {
+        background: linear-gradient(180deg, #FAF8FF 0%, #FFFFFF 72%);
+    }
+    .sa-stat-card.tone-violet::before {
+        background: linear-gradient(90deg, #7E22CE, #A78BFA);
+    }
+    .sa-stat-card.tone-emerald {
+        background: linear-gradient(180deg, #F0FDF4 0%, #FFFFFF 72%);
+    }
+    .sa-stat-card.tone-emerald::before {
+        background: linear-gradient(90deg, #059669, #34D399);
+    }
+
+    .sa-stat-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+    }
+
+    .sa-stat-value {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--sa-text-main);
+        display: block;
+    }
+
+    .sa-stat-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--sa-text-muted);
+    }
+
+    .sa-stat-meta {
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Chart Panels */
+    .sa-chart-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+        align-items: stretch;
+    }
+    @@media (max-width: 1024px) {
+        .sa-chart-row { grid-template-columns: 1fr; }
+    }
+
+    .sa-panel {
+        background: var(--sa-card-bg);
+        border: 1px solid var(--card-border-color, var(--sa-border));
+        border-radius: var(--card-radius, 1rem);
+        padding: 1.5rem;
+        box-shadow: var(--card-shadow, 0 1px 4px rgba(0,0,0,.05));
+        min-height: var(--card-min-height-md, 210px);
+        height: 100%;
+    }
+
+    .sa-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1.5rem;
+        gap: 0.75rem;
+    }
+
+    .sa-range-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .sa-panel-title h2 {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: var(--sa-text-main);
+    }
+
+    .sa-panel-title p {
+        font-size: 0.8125rem;
+        color: var(--sa-text-muted);
+    }
+
+    /* Quick Actions */
+    .sa-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 2rem;
+        align-items: stretch;
+    }
+    @@media (max-width: 768px) {
+        .sa-actions-grid { grid-template-columns: 1fr; }
+    }
+
+    .sa-action-card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem;
+        background: var(--sa-card-bg);
+        border: 1px solid var(--card-border-color, var(--sa-border));
+        border-radius: var(--card-radius, 1rem);
+        text-decoration: none;
+        transition: all 0.2s;
+        min-height: var(--card-min-height-sm, 170px);
+        height: 100%;
+        box-shadow: var(--card-shadow, 0 1px 4px rgba(0,0,0,.05));
+    }
+    .sa-action-card:hover {
+        border-color: #DC2626;
+        background: #FFF5F5;
+        transform: scale(1.02);
+    }
+
+    .sa-action-icon {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .sa-action-text span {
+        display: block;
+        font-weight: 700;
+        color: var(--sa-text-main);
+    }
+    .sa-action-text small {
+        color: var(--sa-text-muted);
+        font-size: 0.75rem;
+    }
+
+    /* Three Column Bottom Row */
+    .sa-bottom-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        align-items: stretch;
+    }
+    @@media (max-width: 1280px) {
+        .sa-bottom-row { grid-template-columns: 1fr; }
+    }
+
+    /* ERP Status */
+    .sa-erp-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        border-radius: 0.75rem;
+        border: 1px solid var(--sa-border);
+        margin-bottom: 0.75rem;
+    }
+    .sa-erp-item.connected { background: #F0FDF4; border-color: #BBF7D0; }
+    .sa-erp-item.disconnected { background: #FEF2F2; border-color: #FECACA; }
+
+    .sa-status-dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+    }
+    .sa-status-dot.online { background: #22C55E; box-shadow: 0 0 8px #22C55E; }
+    .sa-status-dot.offline { background: #EF4444; }
+
+    /* Lists */
+    .sa-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .sa-list-item {
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        border-bottom: 1px solid #F3F4F6;
+    }
+    .sa-list-item:last-child { border-bottom: none; }
+
+    .sa-avatar {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 50%;
+        background: var(--sa-secondary);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.8125rem;
+    }
+
+    .sa-audit-marker {
+        width: 4rem;
+        font-family: monospace;
+        font-size: 0.75rem;
+        color: var(--sa-text-muted);
+    }
+</style>
+
+<div class="sa-root">
+    @if (stats != null)
+    {
+        <!-- Stats Grid -->
+        <div class="sa-stats-grid">
+            <!-- Total Users -->
+            <a href="/superadmin/users" class="sa-stat-card tone-blue" style="text-decoration:none;">
+                <div class="sa-stat-icon" style="background: #EFF6FF; color: #2563EB;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                </div>
+                <span class="sa-stat-value">@stats.TotalUsers</span>
+                <span class="sa-stat-label">Total Platform Users</span>
+                <div class="sa-stat-meta" style="color: #2563EB;">Active Accounts</div>
+            </a>
+
+            <!-- Total Sales -->
+            <a href="/superadmin/reports/financial" class="sa-stat-card tone-red" style="text-decoration:none;">
+                <div class="sa-stat-icon" style="background: #FEF2F2; color: #DC2626;">
+                    <span class="text-2xl font-black leading-none">₱</span>
+                </div>
+                <span class="sa-stat-value">₱@stats.TotalSales.ToString("N0")</span>
+                <span class="sa-stat-label">Gross Platform Revenue</span>
+                <div class="sa-stat-meta" style="color: #DC2626;">Aggregated Sales</div>
+            </a>
+
+            <!-- Active Admins -->
+            <a href="/superadmin/admins" class="sa-stat-card tone-violet" style="text-decoration:none;">
+                <div class="sa-stat-icon" style="background: #FAF5FF; color: #7E22CE;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <span class="sa-stat-value">@stats.ActiveAdmins</span>
+                <span class="sa-stat-label">Privileged Access Nodes</span>
+                <div class="sa-stat-meta" style="color: #7E22CE;">Online Admins</div>
+            </a>
+
+            <!-- Subscription & Branching -->
+            <a href="/superadmin/governance" class="sa-stat-card tone-emerald" style="text-decoration:none;">
+                <div class="sa-stat-icon" style="background: #ECFDF5; color: #059669;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 7h16M7 4v6M17 4v6M6 14h12a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2a2 2 0 012-2z" />
+                        <path d="M9 18h.01M13 18h.01M17 18h.01" />
+                    </svg>
+                </div>
+                <span class="sa-stat-value">@activeBranchesCount</span>
+                <span class="sa-stat-label">Active Branches</span>
+                <div class="sa-stat-meta" style="color: #059669;">Plan: @(currentSubscription?.PlanCode ?? "N/A") · Limit: @(currentSubscription?.MaxBranches ?? 0)</div>
+            </a>
+
+        </div>
+    }
+    else if (loadError)
+    {
+        <div class="sa-panel" style="text-align: center; border-color: #F87171; background: #FEF2F2; margin-bottom: 2rem;">
+            <div style="color: #DC2626; margin-bottom: 1rem;">
+                <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <h3 style="font-weight: 700; color: #991B1B;">Dashboard Connection Lost</h3>
+            <p style="color: #B91C1C; margin-bottom: 1.5rem;">The system was unable to pull global statistics. Retrying connection...</p>
+            <button @onclick="RunHealthCheck" class="sa-health-btn is-checking">Reconnect Now</button>
+        </div>
+    }
+
+    <!-- Analytics Section -->
+    <div class="sa-chart-row">
+        <!-- Audit Trend -->
+        <div class="sa-panel">
+            <div class="sa-panel-header">
+                <div class="sa-panel-title">
+                    <h2>Global Audit Activity</h2>
+                    <p>Daily system modifications from @trendFrom.ToString("MMM d, yyyy") to @trendTo.ToString("MMM d, yyyy")</p>
+                </div>
+                <div class="sa-range-controls">
+                    <input type="date" @bind-value="trendFrom" @bind-value:format="yyyy-MM-dd"
+                           class="px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 bg-white" />
+                    <span class="text-xs text-gray-500 font-semibold">to</span>
+                    <input type="date" @bind-value="trendTo" @bind-value:format="yyyy-MM-dd"
+                           class="px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 bg-white" />
+                    <button class="sa-health-btn" style="padding:.35rem .65rem; font-size:.72rem;" type="button" @onclick="ApplyTrendRange">Apply</button>
+                    <button class="sa-health-btn" style="padding:.35rem .65rem; font-size:.72rem;" type="button" @onclick="ExportTrendToPdf">Export PDF</button>
+                </div>
+            </div>
+            <div style="height: 280px; position: relative;">
+                @if (auditTrendData.Any())
+                {
+                    <ApexChart TItem="SimplePoint" Height="280">
+                        <ApexPointSeries TItem="SimplePoint"
+                                         Items="auditTrendData"
+                                         Name="System Actions"
+                                         SeriesType="SeriesType.Area"
+                                         XValue="@(p => p.Label)"
+                                         YValue="@(p => p.Value)"
+                                         Color="#DC2626" />
+                    </ApexChart>
+                }
+            </div>
+        </div>
+
+        <!-- Login Trend -->
+        <div class="sa-panel">
+            <div class="sa-panel-header">
+                <div class="sa-panel-title">
+                    <h2>User Authentication Traffic</h2>
+                    <p>Daily sign-in distribution across all roles (@trendFrom.ToString("MMM d") to @trendTo.ToString("MMM d"))</p>
+                </div>
+            </div>
+            <div style="height: 280px; position: relative;">
+                @if (loginTrendData.Any())
+                {
+                    <ApexChart TItem="SimplePoint" Height="280">
+                        <ApexPointSeries TItem="SimplePoint"
+                                         Items="loginTrendData"
+                                         Name="Logins"
+                                         SeriesType="SeriesType.Bar"
+                                         XValue="@(p => p.Label)"
+                                         YValue="@(p => p.Value)"
+                                         Color="#2563EB" />
+                    </ApexChart>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Lists Row -->
+    <div class="sa-bottom-row">
+        <!-- ERP Integration Panel -->
+        <div class="sa-panel">
+            <div class="sa-panel-header">
+                <div class="sa-panel-title">
+                    <h2>Infrastructure Monitor</h2>
+                    <p>External ERP & API Connectivity</p>
+                </div>
+            </div>
+            <div class="sa-erp-item @(inventoryApiStatus == "Connected" ? "connected" : "disconnected")">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <div class="sa-status-dot @(inventoryApiStatus == "Connected" ? "online" : "offline")"></div>
+                    <span style="font-weight:600; color:#1F2937;">Inventory Engine</span>
+                </div>
+                <div style="text-align:right">
+                    <div style="font-size:0.75rem; font-weight:700;">@(isChecking ? "Pinging..." : inventoryApiStatus)</div>
+                    <div style="font-size:0.65rem; color:#6B7280;">@(isChecking ? "---" : inventoryApiResponseTime)</div>
+                </div>
+            </div>
+            <div class="sa-erp-item @(financeApiStatus == "Connected" ? "connected" : "disconnected")">
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <div class="sa-status-dot @(financeApiStatus == "Connected" ? "online" : "offline")"></div>
+                    <span style="font-weight:600; color:#1F2937;">Finance ERP Hub</span>
+                </div>
+                <div style="text-align:right">
+                    <div style="font-size:0.75rem; font-weight:700;">@(isChecking ? "Pinging..." : financeApiStatus)</div>
+                    <div style="font-size:0.65rem; color:#6B7280;">@(isChecking ? "---" : financeApiResponseTime)</div>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; padding: 0.75rem; background: #F9FAFB; border-radius: 0.5rem; font-size: 0.75rem; color: #6B7280;">
+                <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/></svg>
+                Last check: @DateTime.Now.ToString("HH:mm:ss")
+            </div>
+        </div>
+
+        <!-- Recent Activity Panel -->
+        <div class="sa-panel">
+            <div class="sa-panel-header">
+                <div class="sa-panel-title">
+                    <h2>IAM Activity</h2>
+                    <p>Recent user identity movements</p>
+                </div>
+                <a href="/superadmin/users" style="font-size:0.75rem; font-weight:700; color:#DC2626; text-decoration:none;">IAM View →</a>
+            </div>
+            <div class="sa-list">
+                @if (recentUsers != null && recentUsers.Any())
+                {
+                    @foreach (var user in pagedRecentUsers)
+                    {
+                        <div class="sa-list-item">
+                            <div class="sa-avatar">@user.FirstName[0]@user.LastName[0]</div>
+                            <div style="flex:1">
+                                <div style="font-size:0.875rem; font-weight:700;">@user.FirstName @user.LastName</div>
+                                <div style="font-size:0.75rem; color:var(--sa-text-muted);">@user.Email</div>
+                            </div>
+                            <div style="text-align:right">
+                                <div style="font-size:0.65rem; color:var(--sa-text-muted);">Last Access</div>
+                                <div style="font-size:0.75rem; font-weight:600;">@(user.LastLoginAt?.ToString("MMM dd HH:mm") ?? "N/A")</div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div style="padding:2rem; text-align:center; color:var(--sa-text-muted); font-size:0.875rem;">No recent IAM signals</div>
+                }
+            </div>
+            @if (recentUsers != null && recentUsers.Any())
+            {
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:.75rem 1rem 0;">
+                    <span style="font-size:.7rem; color:#6B7280;">Showing @usersStartIndex-@usersEndIndex of @recentUsers.Count · Page @usersPage/@usersTotalPages</span>
+                    <div style="display:flex; gap:.4rem;">
+                        <button type="button" @onclick="PreviousUsersPage" disabled="@(usersPage <= 1)" class="sa-health-btn" style="padding:.25rem .6rem; font-size:.7rem;">Previous</button>
+                        <button type="button" @onclick="NextUsersPage" disabled="@(usersPage >= usersTotalPages)" class="sa-health-btn" style="padding:.25rem .6rem; font-size:.7rem;">Next</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Global Audit Stream -->
+        <div class="sa-panel">
+            <div class="sa-panel-header">
+                <div class="sa-panel-title">
+                    <h2>Live Audit Stream</h2>
+                    <p>Sequence of global state changes</p>
+                </div>
+            </div>
+            <div class="sa-list" style="max-height: 240px; overflow-y: auto;">
+                @if (auditLogs != null && auditLogs.Any())
+                {
+                    @foreach (var log in pagedAuditLogs)
+                    {
+                        <div class="sa-list-item" style="padding: 0.75rem 0; cursor: pointer;" @onclick='() => OpenAuditContext(log)'>
+                            <div class="sa-audit-marker">@log.Timestamp.ToString("HH:mm:ss")</div>
+                            <div style="flex:1">
+                                <div style="font-size:0.75rem; font-weight:700;">@log.Action</div>
+                                <div style="font-size:0.7rem; color:var(--sa-text-muted);">@log.UserEmail</div>
+                            </div>
+                            <div style="width: 2rem; display:flex; justify-content:center;">
+                                <div style="width:0.4rem; height:0.4rem; border-radius:50%; background:#D1D5DB;"></div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div style="padding:2rem; text-align:center; color:var(--sa-text-muted); font-size:0.875rem;">Stream silent</div>
+                }
+            </div>
+            @if (auditLogs != null && auditLogs.Any())
+            {
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:.75rem 0 0;">
+                    <span style="font-size:.7rem; color:#6B7280;">Showing @auditStartIndex-@auditEndIndex of @auditLogs.Count · Page @auditPage/@auditTotalPages</span>
+                    <div style="display:flex; gap:.4rem;">
+                        <button type="button" @onclick="PreviousAuditPage" disabled="@(auditPage <= 1)" class="sa-health-btn" style="padding:.25rem .6rem; font-size:.7rem;">Previous</button>
+                        <button type="button" @onclick="NextAuditPage" disabled="@(auditPage >= auditTotalPages)" class="sa-health-btn" style="padding:.25rem .6rem; font-size:.7rem;">Next</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private SystemStats? stats;
+    private List<AuditLog>? auditLogs;
+    private List<User>? recentUsers;
+    private TenantSubscriptionModel? currentSubscription;
+    private List<BranchModel> branches = new();
+    private bool isChecking = false;
+    private bool loadError = false;
+    private List<SimplePoint> auditTrendData = new();
+    private List<SimplePoint> loginTrendData = new();
+    private DateTime trendFrom = DateTime.Today.AddDays(-6);
+    private DateTime trendTo = DateTime.Today;
+    private int usersPage = 1;
+    private int auditPage = 1;
+    private const int usersPageSize = 4;
+    private const int auditPageSize = 10;
+    private int usersTotalPages => Math.Max(1, (int)Math.Ceiling((recentUsers?.Count ?? 0) / (double)usersPageSize));
+    private int auditTotalPages => Math.Max(1, (int)Math.Ceiling((auditLogs?.Count ?? 0) / (double)auditPageSize));
+    private List<User> pagedRecentUsers => (recentUsers ?? new())
+        .Skip((usersPage - 1) * usersPageSize)
+        .Take(usersPageSize)
+        .ToList();
+    private List<AuditLog> pagedAuditLogs => (auditLogs ?? new())
+        .Skip((auditPage - 1) * auditPageSize)
+        .Take(auditPageSize)
+        .ToList();
+    private int usersStartIndex => (recentUsers?.Count ?? 0) == 0 ? 0 : ((usersPage - 1) * usersPageSize) + 1;
+    private int usersEndIndex => (recentUsers?.Count ?? 0) == 0 ? 0 : Math.Min(usersPage * usersPageSize, recentUsers!.Count);
+    private int auditStartIndex => (auditLogs?.Count ?? 0) == 0 ? 0 : ((auditPage - 1) * auditPageSize) + 1;
+    private int auditEndIndex => (auditLogs?.Count ?? 0) == 0 ? 0 : Math.Min(auditPage * auditPageSize, auditLogs!.Count);
+
+    private string inventoryApiStatus = "Scanning...";
+    private string inventoryApiResponseTime = "---";
+    private string financeApiStatus = "Scanning...";
+    private string financeApiResponseTime = "---";
+    private int activeBranchesCount => branches.Count(b => b.IsActive);
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllData();
+    }
+
+    private async Task LoadAllData()
+    {
+        try
+        {
+            loadError = false;
+            var statsTask = ApiClient.GetSuperAdminStatsAsync();
+            var auditLogsTask = ApiClient.GetAuditLogsAsync();
+            var recentUsersTask = ApiClient.GetRecentUserActivityAsync();
+            var subscriptionTask = ApiClient.GetCurrentSubscriptionAsync();
+            var branchesTask = ApiClient.GetBranchesAsync();
+
+            await Task.WhenAll(statsTask, auditLogsTask, recentUsersTask, subscriptionTask, branchesTask);
+
+            stats = await statsTask;
+            auditLogs = await auditLogsTask;
+            recentUsers = await recentUsersTask;
+            currentSubscription = await subscriptionTask;
+            branches = await branchesTask ?? new();
+            usersPage = 1;
+            auditPage = 1;
+            BuildChartData();
+
+            await PingErpEndpoints();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+            loadError = true;
+        }
+    }
+
+    private async Task PingErpEndpoints()
+    {
+        var inventoryTask = PingEndpoint(async () => (object?)await ApiClient.GetProductsAsync());
+        var financeTask = PingEndpoint(async () => (object?)await ApiClient.GetErpFinancialSummaryAsync());
+        await Task.WhenAll(inventoryTask, financeTask);
+
+        (inventoryApiStatus, inventoryApiResponseTime) = await inventoryTask;
+        (financeApiStatus, financeApiResponseTime) = await financeTask;
+    }
+
+    private async Task<(string Status, string ResponseTime)> PingEndpoint(Func<Task<object?>> apiCall)
+    {
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var response = await apiCall();
+            sw.Stop();
+            return (response != null ? "Connected" : "Disconnected", $"{sw.ElapsedMilliseconds}ms");
+        }
+        catch
+        {
+            return ("Disconnected", "N/A");
+        }
+    }
+
+    private async Task RunHealthCheck()
+    {
+        isChecking = true;
+        loadError = false;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Delay(800); // UI visual feedback
+            await LoadAllData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during health check: {ex.Message}");
+            loadError = true;
+        }
+        finally
+        {
+            isChecking = false;
+            StateHasChanged();
+        }
+    }
+
+    private void BuildChartData()
+    {
+        if (trendFrom > trendTo)
+        {
+            (trendFrom, trendTo) = (trendTo, trendFrom);
+        }
+
+        var daySpan = (trendTo.Date - trendFrom.Date).Days;
+        var totalDays = Math.Max(1, daySpan + 1);
+
+        var days = Enumerable.Range(0, totalDays)
+            .Select(i => trendFrom.Date.AddDays(i))
+            .ToList();
+
+        auditTrendData = days
+            .Select(d => new SimplePoint
+            {
+                Label = totalDays <= 14 ? d.ToString("ddd") : d.ToString("MMM d"),
+                Value = auditLogs?.Count(a => a.Timestamp.Date == d.Date) ?? 0
+            })
+            .ToList();
+
+        loginTrendData = days
+            .Select(d => new SimplePoint
+            {
+                Label = totalDays <= 14 ? d.ToString("ddd") : d.ToString("MMM d"),
+                Value = recentUsers?.Count(u => u.LastLoginAt?.Date == d.Date) ?? 0
+            })
+            .ToList();
+    }
+
+    private void ApplyTrendRange()
+    {
+        BuildChartData();
+    }
+
+    private async Task ExportTrendToPdf()
+    {
+        var title = $"Super Admin Dashboard ({trendFrom:MMM d, yyyy} to {trendTo:MMM d, yyyy})";
+        await JSRuntime.InvokeVoidAsync("exportToPdf", title);
+    }
+
+    private void OpenAuditContext(AuditLog log)
+    {
+        var searchTerm = !string.IsNullOrWhiteSpace(log.Action)
+            ? log.Action
+            : !string.IsNullOrWhiteSpace(log.UserEmail)
+                ? log.UserEmail
+                : log.Description ?? string.Empty;
+
+        var encodedTerm = Uri.EscapeDataString(searchTerm);
+        var encodedTimestamp = Uri.EscapeDataString(log.Timestamp.ToString("o"));
+        NavigationManager.NavigateTo($"/superadmin/audit?q={encodedTerm}&id={log.Id}&ts={encodedTimestamp}");
+    }
+
+    private void OpenSuperAdminRoute(string route)
+    {
+        NavigationManager.NavigateTo(route);
+    }
+
+    private void PreviousUsersPage()
+    {
+        if (usersPage <= 1) return;
+        usersPage--;
+    }
+
+    private void NextUsersPage()
+    {
+        if (usersPage >= usersTotalPages) return;
+        usersPage++;
+    }
+
+    private void PreviousAuditPage()
+    {
+        if (auditPage <= 1) return;
+        auditPage--;
+    }
+
+    private void NextAuditPage()
+    {
+        if (auditPage >= auditTotalPages) return;
+        auditPage++;
+    }
+
+    public class SimplePoint
+    {
+        public string Label { get; set; } = string.Empty;
+        public int Value { get; set; }
+    }
+}

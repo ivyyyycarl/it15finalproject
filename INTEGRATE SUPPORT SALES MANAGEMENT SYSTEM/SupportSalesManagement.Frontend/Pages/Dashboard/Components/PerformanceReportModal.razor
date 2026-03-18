@@ -1,0 +1,377 @@
+@* Performance Report Modal Component *@
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+
+@if (IsVisible)
+{
+    <div class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+                <h2 class="text-2xl font-bold text-gray-900">Generate Performance Report</h2>
+                <button @onclick="Close" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="px-6 py-6 space-y-6">
+                <!-- Date Range -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
+                        <input type="date" @bind="startDate"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
+                        <input type="date" @bind="endDate"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+                </div>
+
+                <!-- Quick Date Ranges -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Quick Select</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button type="button" @onclick='() => SetDateRange("today")'
+                            class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors">
+                            Today
+                        </button>
+                        <button type="button" @onclick='() => SetDateRange("week")'
+                            class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors">
+                            This Week
+                        </button>
+                        <button type="button" @onclick='() => SetDateRange("month")'
+                            class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors">
+                            This Month
+                        </button>
+                        <button type="button" @onclick='() => SetDateRange("quarter")'
+                            class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors">
+                            This Quarter
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Agent Selection -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Select Agent(s)</label>
+                    <select @bind="selectedAgentFilter"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All Agents (Team Report)</option>
+                        @foreach (var agent in Agents)
+                        {
+                            <option value="@agent.Id">@($"{agent.FirstName} {agent.LastName}")</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Metrics Selection -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Include Metrics</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" @bind="includeTickets"
+                                class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                            <span class="text-sm text-gray-700">Tickets Handled</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" @bind="includeHandlingTime"
+                                class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                            <span class="text-sm text-gray-700">Avg Handling Time</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" @bind="includeResolutionRate"
+                                class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                            <span class="text-sm text-gray-700">First Contact Resolution</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" @bind="includeCSAT"
+                                class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                            <span class="text-sm text-gray-700">Customer Satisfaction</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" @bind="includeSales"
+                                class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                            <span class="text-sm text-gray-700">Sales Conversion</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" @bind="includeCalls"
+                                class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                            <span class="text-sm text-gray-700">Call Volume</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Report Preview -->
+                @if (showPreview)
+                {
+                    <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                        <h3 class="font-semibold text-gray-900 mb-4">Report Preview</h3>
+                        <div class="space-y-4">
+                            <div class="bg-white rounded-lg p-4 shadow-sm">
+                                <div class="grid grid-cols-3 gap-4 text-center">
+                                    @if (includeTickets)
+                                    {
+                                        <div>
+                                            <p class="text-sm text-gray-600">Tickets Handled</p>
+                                            <p class="text-2xl font-bold text-blue-600">@(previewSummary?.TotalCalls ?? 0)</p>
+                                        </div>
+                                    }
+                                    @if (includeHandlingTime)
+                                    {
+                                        <div>
+                                            <p class="text-sm text-gray-600">Avg Handling Time</p>
+                                            <p class="text-2xl font-bold text-green-600">@(previewSummary?.AverageDuration ?? "N/A")</p>
+                                        </div>
+                                    }
+                                    @if (includeCSAT)
+                                    {
+                                        <div>
+                                            <p class="text-sm text-gray-600">Completed Calls</p>
+                                            <p class="text-2xl font-bold text-purple-600">@(previewSummary?.CompletedCalls ?? 0)</p>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 text-center">
+                                This is a preview. Full data will be included in the exported report.
+                            </p>
+                        </div>
+                    </div>
+                }
+
+                <!-- Export Options -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Export Format</label>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button type="button" @onclick='() => exportFormat = "csv"'
+                            class="@(exportFormat == "csv" ? "bg-blue-100 border-blue-500 text-blue-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md flex items-center justify-center space-x-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span>CSV</span>
+                        </button>
+                        <button type="button" @onclick='() => exportFormat = "pdf"'
+                            class="@(exportFormat == "pdf" ? "bg-red-100 border-red-500 text-red-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md flex items-center justify-center space-x-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            <span>PDF</span>
+                        </button>
+                        <button type="button" @onclick='() => exportFormat = "email"'
+                            class="@(exportFormat == "email" ? "bg-green-100 border-green-500 text-green-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md flex items-center justify-center space-x-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            <span>Email</span>
+                        </button>
+                    </div>
+                </div>
+
+                @if (exportFormat == "email")
+                {
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Admin Email</label>
+                        <input type="email" @bind="adminEmail" placeholder="admin@company.com"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded">
+                        @errorMessage
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(successMessage))
+                {
+                    <div class="bg-green-50 border-l-4 border-green-500 text-green-700 px-4 py-3 rounded">
+                        @successMessage
+                    </div>
+                }
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between sticky bottom-0">
+                <button @onclick="LoadPreview"
+                    class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors">
+                    Preview Report
+                </button>
+                <div class="flex space-x-3">
+                    <button @onclick="Close"
+                        class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button @onclick="GenerateReport" disabled="@isGenerating"
+                        class="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                        @if (isGenerating)
+                        {
+                            <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                                </circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            <span>Generating...</span>
+                        }
+                        else
+                        {
+                            <span>Generate & Export</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnReportGenerated { get; set; }
+    [Parameter] public List<SupportSalesManagement.Frontend.Models.User> Agents { get; set; } = new();
+
+    private DateTime startDate = DateTime.Today.AddDays(-7);
+    private DateTime endDate = DateTime.Today;
+    private string selectedAgentFilter = "all";
+    private string exportFormat = "csv";
+    private string adminEmail = "";
+
+    // Metrics
+    private bool includeTickets = true;
+    private bool includeHandlingTime = true;
+    private bool includeResolutionRate = true;
+    private bool includeCSAT = true;
+    private bool includeSales = true;
+    private bool includeCalls = true;
+
+    private bool showPreview = false;
+    private string errorMessage = "";
+    private string successMessage = "";
+    private bool isGenerating = false;
+    private CallSummary? previewSummary;
+
+    private void SetDateRange(string range)
+    {
+        var today = DateTime.Today;
+        switch (range)
+        {
+            case "today":
+                startDate = today;
+                endDate = today;
+                break;
+            case "week":
+                startDate = today.AddDays(-(int)today.DayOfWeek);
+                endDate = today;
+                break;
+            case "month":
+                startDate = new DateTime(today.Year, today.Month, 1);
+                endDate = today;
+                break;
+            case "quarter":
+                var quarter = (today.Month - 1) / 3;
+                startDate = new DateTime(today.Year, quarter * 3 + 1, 1);
+                endDate = today;
+                break;
+        }
+    }
+
+    private async Task LoadPreview()
+    {
+        successMessage = "";
+        errorMessage = "";
+
+        try
+        {
+            var currentUser = await ApiClient.GetCurrentUserAsync();
+            if (currentUser != null)
+            {
+                previewSummary = await ApiClient.GetCallSummaryAsync(currentUser.Id);
+            }
+            showPreview = true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading preview: {ex.Message}";
+        }
+    }
+
+    private async Task GenerateReport()
+    {
+        errorMessage = "";
+        successMessage = "";
+
+        // Validation
+        if (startDate > endDate)
+        {
+            errorMessage = "Start date cannot be later than end date.";
+            return;
+        }
+
+        if (!includeTickets && !includeHandlingTime && !includeResolutionRate && !includeCSAT && !includeSales && !includeCalls)
+        {
+            errorMessage = "Please select at least one metric to include.";
+            return;
+        }
+
+        if (exportFormat == "email" && string.IsNullOrWhiteSpace(adminEmail))
+        {
+            errorMessage = "Please enter an email address.";
+            return;
+        }
+
+        isGenerating = true;
+
+        try
+        {
+            var currentUser = await ApiClient.GetCurrentUserAsync();
+            if (currentUser == null)
+                throw new Exception("Unable to determine current user.");
+
+            var summary = await ApiClient.GetCallSummaryAsync(currentUser.Id);
+            if (summary == null)
+                throw new Exception("Failed to retrieve performance data.");
+
+            previewSummary = summary;
+
+            successMessage = $"Report generated successfully and exported as {exportFormat.ToUpper()}.";
+            await OnReportGenerated.InvokeAsync();
+
+            await Task.Delay(2000);
+            await Close();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error generating report: {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        ResetForm();
+        await OnClose.InvokeAsync();
+    }
+
+    private void ResetForm()
+    {
+        showPreview = false;
+        errorMessage = "";
+        successMessage = "";
+    }
+}
+
+

@@ -1,0 +1,305 @@
+@page "/admin/orders/track"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+
+<PageTitle>Admin - Order Tracking</PageTitle>
+
+<div class="px-6 py-8">
+    <div class="mb-6 flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Order Tracking</h1>
+            <p class="text-sm text-gray-500">Track order status and shipment progress</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex justify-center py-12">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        </div>
+    }
+    else
+    {
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Pending</p>
+                        <p class="text-2xl font-bold text-yellow-600">@allOrders.Count(o => o.Status == "Pending")</p>
+                    </div>
+                    <div class="p-3 bg-yellow-100 rounded-full">
+                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Processing</p>
+                        <p class="text-2xl font-bold text-blue-600">@allOrders.Count(o => o.Status == "Processing")</p>
+                    </div>
+                    <div class="p-3 bg-blue-100 rounded-full">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">In Transit</p>
+                        <p class="text-2xl font-bold text-purple-600">@allOrders.Count(o => o.Status == "Shipped")</p>
+                    </div>
+                    <div class="p-3 bg-purple-100 rounded-full">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0">
+                            </path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Delivered</p>
+                        <p class="text-2xl font-bold text-green-600">@allOrders.Count(o => o.Status == "Delivered")</p>
+                    </div>
+                    <div class="p-3 bg-green-100 rounded-full">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6">
+            <div class="flex gap-4">
+                <input type="text" @bind="searchTerm" @bind:event="oninput" placeholder="Enter Order Number..."
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                <button @onclick="FilterOrders" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                    Track Order
+                </button>
+            </div>
+        </div>
+
+        <!-- Orders List -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Orders</h2>
+            @if (!filteredOrders.Any())
+            {
+                <div class="p-12 text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0">
+                        </path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No orders found</h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        @(allOrders.Any() ? "Try adjusting your search." : "No orders have been placed yet.")
+                    </p>
+                </div>
+            }
+            else
+            {
+                <div class="space-y-4">
+                    @foreach (var order in filteredOrders)
+                    {
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div>
+                                    <p class="font-semibold text-gray-900">Order #@order.OrderNumber</p>
+                                    <p class="text-sm text-gray-500">
+                                        Customer: @(string.IsNullOrEmpty(order.CustomerName) ? $"Customer #{order.CustomerId}" : order.CustomerName)
+                                    </p>
+                                    <p class="text-sm text-gray-500">
+                                        Total: @($"₱{order.TotalAmount:N2}")
+                                    </p>
+                                </div>
+                                <span class="px-3 py-1 @GetStatusBadgeClass(order.Status) text-sm font-medium rounded-full">
+                                    @order.Status
+                                </span>
+                            </div>
+
+                            <div class="relative">
+                                <div class="absolute left-2 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                                <div class="space-y-3 relative">
+                                    @{
+                                        var progress = GetStatusProgress(order.Status);
+                                        var isOrderPlaced = progress >= 1;
+                                        var isProcessing = progress >= 2;
+                                        var isShipped = progress >= 3;
+                                        var isDelivered = progress >= 4;
+                                        var isCurrentlyProcessing = order.Status == "Processing";
+                                        var isCurrentlyShipped = order.Status == "Shipped";
+                                    }
+                                    
+                                    <!-- Order Placed -->
+                                    <div class="flex items-start">
+                                        <div class="@(isOrderPlaced ? "w-4 h-4 bg-green-500 rounded-full mr-3 mt-0.5" : "w-4 h-4 bg-gray-300 rounded-full mr-3 mt-0.5")"></div>
+                                        <div>
+                                            <p class="@(isOrderPlaced ? "font-medium text-sm" : "font-medium text-sm text-gray-400")">Order Placed</p>
+                                            <p class="@(isOrderPlaced ? "text-xs text-gray-500" : "text-xs text-gray-400")">@order.OrderDate.ToString("MMM dd, yyyy HH:mm")</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Processing -->
+                                    <div class="flex items-start">
+                                        <div class="@(isProcessing ? (isCurrentlyProcessing ? "w-4 h-4 bg-blue-500 rounded-full mr-3 mt-0.5 animate-pulse" : "w-4 h-4 bg-green-500 rounded-full mr-3 mt-0.5") : "w-4 h-4 bg-gray-300 rounded-full mr-3 mt-0.5")"></div>
+                                        <div>
+                                            <p class="@(isProcessing || isCurrentlyProcessing ? "font-medium text-sm" : "font-medium text-sm text-gray-400")">Processing</p>
+                                            <p class="@(isProcessing || isCurrentlyProcessing ? "text-xs text-gray-500" : "text-xs text-gray-400")">
+                                                @if (isProcessing || isCurrentlyProcessing)
+                                                {
+                                                    @order.OrderDate.AddDays(1).ToString("MMM dd, yyyy HH:mm")
+                                                }
+                                                else
+                                                {
+                                                    <text>Pending</text>
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Shipped -->
+                                    <div class="flex items-start">
+                                        <div class="@(isShipped ? (isCurrentlyShipped ? "w-4 h-4 bg-blue-500 rounded-full mr-3 mt-0.5 animate-pulse" : "w-4 h-4 bg-green-500 rounded-full mr-3 mt-0.5") : "w-4 h-4 bg-gray-300 rounded-full mr-3 mt-0.5")"></div>
+                                        <div>
+                                            <p class="@(isShipped || isCurrentlyShipped ? "font-medium text-sm" : "font-medium text-sm text-gray-400")">Shipped</p>
+                                            <p class="@(isShipped || isCurrentlyShipped ? "text-xs text-gray-500" : "text-xs text-gray-400")">
+                                                @if (isShipped || isCurrentlyShipped)
+                                                {
+                                                    @order.OrderDate.AddDays(2).ToString("MMM dd, yyyy HH:mm")
+                                                }
+                                                else
+                                                {
+                                                    <text>Pending</text>
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Delivered -->
+                                    <div class="flex items-start">
+                                        <div class="@(isDelivered ? "w-4 h-4 bg-green-500 rounded-full mr-3 mt-0.5" : "w-4 h-4 bg-gray-300 rounded-full mr-3 mt-0.5")"></div>
+                                        <div>
+                                            <p class="@(isDelivered ? "font-medium text-sm" : "font-medium text-sm text-gray-400")">Delivered</p>
+                                            <p class="@(isDelivered ? "text-xs text-gray-500" : "text-xs text-gray-400")">
+                                                @if (isDelivered)
+                                                {
+                                                    @order.OrderDate.AddDays(3).ToString("MMM dd, yyyy HH:mm")
+                                                }
+                                                else
+                                                {
+                                                    <text>Pending</text>
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Order> allOrders = new();
+    private List<Order> filteredOrders = new();
+    private bool isLoading = true;
+    private string searchTerm = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        isLoading = true;
+        try
+        {
+            var orders = await ApiClient.GetOrdersAsync();
+            if (orders != null)
+            {
+                allOrders = orders.OrderByDescending(o => o.OrderDate).ToList();
+            }
+            else
+            {
+                allOrders = new();
+            }
+            FilterOrders();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading orders: {ex.Message}");
+            allOrders = new();
+            filteredOrders = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void FilterOrders()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            // Show all orders when no search term
+            filteredOrders = allOrders.ToList();
+        }
+        else
+        {
+            var term = searchTerm.Trim().ToLowerInvariant();
+            filteredOrders = allOrders.Where(o =>
+                (o.OrderNumber ?? "").ToLowerInvariant().Contains(term) ||
+                o.Id.ToString().Contains(term)
+            ).ToList();
+        }
+    }
+
+    private int GetStatusProgress(string status)
+    {
+        return status switch
+        {
+            "Pending" => 1,
+            "Processing" => 2,
+            "Shipped" => 3,
+            "Delivered" => 4,
+            _ => 0
+        };
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Pending" => "bg-yellow-100 text-yellow-800",
+            "Processing" => "bg-blue-100 text-blue-800",
+            "Shipped" => "bg-purple-100 text-purple-800",
+            "Delivered" => "bg-green-100 text-green-800",
+            "Cancelled" => "bg-red-100 text-red-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+}

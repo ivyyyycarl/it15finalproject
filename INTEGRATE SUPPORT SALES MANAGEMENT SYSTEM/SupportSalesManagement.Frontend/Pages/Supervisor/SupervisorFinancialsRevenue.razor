@@ -1,0 +1,176 @@
+@page "/supervisor/financials/revenue"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor,Admin")]
+@inject SupportSalesManagement.Frontend.Services.ApiClient ApiClient
+
+<div class="p-6 space-y-4" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-[22px] font-bold text-gray-900">Revenue Trends</h1>
+                <p class="text-sm text-gray-500">Analyze revenue patterns and growth (Read-Only Access, @selectedRangeDays-day view)</p>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span class="text-xs font-medium text-yellow-800">Read-Only Access</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue Overview -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-lg shadow text-white">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm opacity-90">This Month</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+            </div>
+            <p class="text-3xl font-bold">$125,750</p>
+            <p class="text-xs opacity-75 mt-1">↑ 12.5% from last month</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-lg shadow text-white">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm opacity-90">This Quarter</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+            </div>
+            <p class="text-3xl font-bold">$356,420</p>
+            <p class="text-xs opacity-75 mt-1">↑ 18.3% from last quarter</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-lg shadow text-white">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm opacity-90">This Year</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <p class="text-3xl font-bold">$1,245,890</p>
+            <p class="text-xs opacity-75 mt-1">↑ 24.7% from last year</p>
+        </div>
+    </div>
+
+    <!-- Monthly Trend Chart Placeholder -->
+    <div class="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Monthly Revenue Trend</h2>
+        <div class="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+            <div class="text-center">
+                <svg class="w-16 h-16 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <p class="text-sm text-gray-600">Chart visualization area</p>
+                <p class="text-xs text-gray-500 mt-1">Displaying last @selectedRangeDays days of revenue data</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue Breakdown -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Revenue by Channel</h2>
+            <div class="space-y-4">
+                @foreach (var channel in revenueByChannel)
+                {
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 rounded-full" style="background-color: @channel.Color"></div>
+                                <span class="text-sm font-medium text-gray-700">@channel.Name</span>
+                            </div>
+                            <span class="text-sm font-semibold text-gray-900">₱@channel.Amount.ToString("N0")</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="w-full bg-gray-200 rounded-full h-2 mr-4">
+                                <div class="h-2 rounded-full"
+                                    style="width: @channel.Percentage%; background-color: @channel.Color"></div>
+                            </div>
+                            <span class="text-xs text-gray-500 whitespace-nowrap">@channel.Percentage%</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Month-over-Month Comparison</h2>
+            <div class="space-y-3">
+                @foreach (var month in monthComparison)
+                {
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">@month.Name</p>
+                            <p class="text-xs text-gray-500">@month.OrderCount orders</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-semibold text-gray-900">₱@month.Revenue.ToString("N0")</p>
+                            @if (month.GrowthRate >= 0)
+                            {
+                                <p class="text-xs text-green-600">↑ @month.GrowthRate%</p>
+                            }
+                            else
+                            {
+                                <p class="text-xs text-red-600">↓ @Math.Abs(month.GrowthRate)%</p>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "range")]
+    public int? QueryRangeDays { get; set; }
+
+    private int selectedRangeDays = 30;
+
+    private class RevenueChannel
+    {
+        public string Name { get; set; } = "";
+        public decimal Amount { get; set; }
+        public int Percentage { get; set; }
+        public string Color { get; set; } = "";
+    }
+
+    private class MonthData
+    {
+        public string Name { get; set; } = "";
+        public decimal Revenue { get; set; }
+        public int OrderCount { get; set; }
+        public decimal GrowthRate { get; set; }
+    }
+
+    private List<RevenueChannel> revenueByChannel = new()
+{
+new RevenueChannel { Name = "Online Store", Amount = 75450, Percentage = 60, Color = "#3B82F6" },
+new RevenueChannel { Name = "In-Store POS", Amount = 37725, Percentage = 30, Color = "#10B981" },
+new RevenueChannel { Name = "Phone Orders", Amount = 12575, Percentage = 10, Color = "#F59E0B" }
+};
+
+    private List<MonthData> monthComparison = new()
+{
+new MonthData { Name = "February 2026", Revenue = 125750, OrderCount = 847, GrowthRate = 12.5m },
+new MonthData { Name = "January 2026", Revenue = 111800, OrderCount = 782, GrowthRate = 8.3m },
+new MonthData { Name = "December 2025", Revenue = 103200, OrderCount = 695, GrowthRate = -2.1m },
+new MonthData { Name = "November 2025", Revenue = 105420, OrderCount = 728, GrowthRate = 15.7m }
+};
+
+    protected override void OnParametersSet()
+    {
+        if (QueryRangeDays is 7 or 14 or 30 or 90 or 180 or 365)
+        {
+            selectedRangeDays = QueryRangeDays.Value;
+        }
+    }
+}

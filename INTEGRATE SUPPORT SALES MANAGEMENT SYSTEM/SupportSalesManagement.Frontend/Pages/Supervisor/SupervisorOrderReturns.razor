@@ -1,0 +1,164 @@
+@page "/supervisor/orders/returns"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor,Admin")]
+@inject IJSRuntime JSRuntime
+
+<div class="p-6 space-y-4" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="mb-6">
+        <h1 class="text-[22px] font-bold text-gray-900">Returns Management</h1>
+        <p class="text-sm text-gray-500">Manage product returns and refunds</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-gradient-to-br from-amber-50 to-white p-5 rounded-xl border border-amber-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Pending Returns</p>
+                    <p class="text-2xl font-bold text-yellow-600">23</p>
+                </div>
+                <div class="p-3 bg-yellow-100 rounded-full">
+                    <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-emerald-50 to-white p-5 rounded-xl border border-emerald-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Approved</p>
+                    <p class="text-2xl font-bold text-green-600">156</p>
+                </div>
+                <div class="p-3 bg-green-100 rounded-full">
+                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-rose-50 to-white p-5 rounded-xl border border-rose-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Rejected</p>
+                    <p class="text-2xl font-bold text-red-600">12</p>
+                </div>
+                <div class="p-3 bg-red-100 rounded-full">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-50 to-white p-5 rounded-xl border border-blue-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Refund Amount</p>
+                    <p class="text-2xl font-bold text-blue-600">$12,450</p>
+                </div>
+                <div class="p-3 bg-blue-100 rounded-full">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Returns Table -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">Return Requests</h2>
+                <div class="flex gap-3">
+                    <select class="px-4 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>All Statuses</option>
+                        <option>Pending</option>
+                        <option>Approved</option>
+                        <option>Rejected</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Return ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                @for (int i = 1; i <= 10; i++)
+                {
+                    var reasons = new[] { "Defective", "Wrong Item", "Not as Described", "Changed Mind" };
+                    var statuses = new[] { "Pending", "Approved", "Rejected" };
+                    var status = statuses[i % 3];
+                    var statusColors = new Dictionary<string, string> {
+                { "Pending", "bg-yellow-100 text-yellow-800" },
+                { "Approved", "bg-green-100 text-green-800" },
+                { "Rejected", "bg-red-100 text-red-800" }
+                };
+
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">RET-@(3000 + i)</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ORD-@(202400 + i)</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Customer @i</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@reasons[i % 4]</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₱@((i * 67.99).ToString("N2"))</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            @DateTime.Now.AddDays(-i).ToString("MMM dd")</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span
+                                class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full @statusColors[status]">
+                                @status
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            @if (status == "Pending")
+                            {
+                                <button @onclick='() => HandleReturnActionAsync("Approve", $"RET-{3000 + i}")' class="text-green-600 hover:text-green-900">Approve</button>
+                                <button @onclick='() => HandleReturnActionAsync("Reject", $"RET-{3000 + i}")' class="text-red-600 hover:text-red-900">Reject</button>
+                            }
+                            else
+                            {
+                                <button @onclick='() => HandleReturnActionAsync("View", $"RET-{3000 + i}")' class="text-blue-600 hover:text-blue-900">View</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private async Task HandleReturnActionAsync(string action, string returnId)
+    {
+        var prompt = action == "View"
+            ? $"Open details for {returnId}?"
+            : $"Confirm {action.ToLowerInvariant()} request {returnId}?";
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", prompt);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        // This page is currently demo/static data; keep user flow clear.
+        await JSRuntime.InvokeVoidAsync("alert", $"{action} action recorded for {returnId}.");
+    }
+}

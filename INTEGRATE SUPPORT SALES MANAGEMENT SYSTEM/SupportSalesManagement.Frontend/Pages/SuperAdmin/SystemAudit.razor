@@ -1,0 +1,296 @@
+@page "/superadmin/audit"
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+@implements IDisposable
+
+<PageTitle>Audit Logs - Super Admin</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Audit Logs</h1>
+            <p class="text-sm text-gray-500">Complete record of system activities and user actions.</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-red-600"></div>
+        </div>
+    }
+    else
+    {
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-gradient-to-b from-blue-50 to-white rounded-xl shadow-sm border border-blue-100 p-4 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Entries</p>
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-gray-900 mt-2">@allLogs.Count</p>
+            </div>
+            <div class="bg-gradient-to-b from-indigo-50 to-white rounded-xl shadow-sm border border-indigo-100 p-4 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Today</p>
+                    <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-indigo-700 mt-2">@allLogs.Count(l => l.Timestamp.Date == DateTime.Today)</p>
+            </div>
+            <div class="bg-gradient-to-b from-violet-50 to-white rounded-xl shadow-sm border border-violet-100 p-4 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">This Week</p>
+                    <div class="w-8 h-8 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-violet-700 mt-2">@allLogs.Count(l => l.Timestamp >= DateTime.Today.AddDays(-7))</p>
+            </div>
+            <div class="bg-gradient-to-b from-emerald-50 to-white rounded-xl shadow-sm border border-emerald-100 p-4 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Unique Users</p>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2a5 5 0 0110 0v2M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-emerald-700 mt-2">@allLogs.Select(l => l.UserEmail).Distinct().Count()</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4">
+                <h3 class="text-lg font-bold text-gray-900">Activity Log</h3>
+                <div class="flex gap-2 flex-wrap">
+                    <input type="text" placeholder="Search by action, user, or description..."
+                        class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-64 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        value="@searchInput"
+                        @oninput="OnSearchInput" />
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-gray-50 text-gray-500 font-medium uppercase tracking-wider">
+                        <tr>
+                            <th class="px-6 py-4">Timestamp</th>
+                            <th class="px-6 py-4">Action</th>
+                            <th class="px-6 py-4">Description</th>
+                            <th class="px-6 py-4">User</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @if (PagedFilteredLogs.Any())
+                        {
+                            @foreach (var log in PagedFilteredLogs)
+                            {
+                                <tr class="@(IsHighlightedLog(log) ? "bg-amber-50 ring-1 ring-amber-200" : "hover:bg-gray-50") transition-colors">
+                                    <td class="px-6 py-4 text-gray-500 whitespace-nowrap">@log.Timestamp.ToString("MMM dd, yyyy HH:mm:ss")</td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold @GetActionClass(log.Action)">@log.Action</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-700 max-w-md truncate">@log.Description</td>
+                                    <td class="px-6 py-4 text-gray-600">@(string.IsNullOrEmpty(log.UserEmail) ? "System" : log.UserEmail)</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="4" class="px-6 py-8 text-center text-gray-500">No audit logs found.</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (filteredLogs.Any())
+            {
+                <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <p class="text-sm text-gray-600">
+                        Showing @(((currentPage - 1) * pageSize) + 1)-@Math.Min(currentPage * pageSize, filteredLogs.Count) of @filteredLogs.Count · Page @currentPage/@TotalPages
+                    </p>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @onclick="PreviousPage" disabled="@(currentPage <= 1)"
+                                class="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                        <button type="button" @onclick="NextPage" disabled="@(currentPage >= TotalPages)"
+                                class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? QueryText { get; set; }
+    [SupplyParameterFromQuery(Name = "id")]
+    public int? HighlightLogId { get; set; }
+    [SupplyParameterFromQuery(Name = "ts")]
+    public string? HighlightTimestampText { get; set; }
+
+    private List<AuditLog> allLogs = new();
+    private List<AuditLog> filteredLogs = new();
+    private bool isLoading = true;
+    private string searchText = "";
+    private string searchInput = "";
+    private CancellationTokenSource? _searchDebounceCts;
+    private DateTime? highlightedTimestamp;
+    private int currentPage = 1;
+    private const int pageSize = 15;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(filteredLogs.Count / (double)pageSize));
+    private List<AuditLog> PagedFilteredLogs => filteredLogs
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var logs = await ApiClient.GetAuditLogsAsync();
+            allLogs = logs?.OrderByDescending(l => l.Timestamp).ToList() ?? new();
+            if (!string.IsNullOrWhiteSpace(QueryText))
+            {
+                searchInput = QueryText.Trim();
+                searchText = searchInput;
+            }
+            highlightedTimestamp = ParseHighlightedTimestamp(HighlightTimestampText);
+            FilterLogs();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading audit logs: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        highlightedTimestamp = ParseHighlightedTimestamp(HighlightTimestampText);
+
+        if (string.IsNullOrWhiteSpace(QueryText))
+        {
+            FilterLogs();
+            return;
+        }
+
+        var incoming = QueryText.Trim();
+        if (string.Equals(incoming, searchText, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        searchInput = incoming;
+        searchText = incoming;
+        FilterLogs();
+    }
+
+    private void FilterLogs()
+    {
+        var query = allLogs.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var term = searchText.Trim();
+            query = query.Where(l =>
+                (l.Action?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (l.UserEmail?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (l.Description?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+        filteredLogs = query.ToList();
+        currentPage = 1;
+    }
+
+    private string GetActionClass(string action)
+    {
+        if (string.IsNullOrEmpty(action)) return "bg-gray-100 text-gray-800";
+        var lower = action.ToLower();
+        if (lower.Contains("delete") || lower.Contains("remove")) return "bg-red-100 text-red-800";
+        if (lower.Contains("create") || lower.Contains("add")) return "bg-green-100 text-green-800";
+        if (lower.Contains("update") || lower.Contains("edit")) return "bg-blue-100 text-blue-800";
+        if (lower.Contains("login") || lower.Contains("auth")) return "bg-purple-100 text-purple-800";
+        return "bg-gray-100 text-gray-800";
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchInput = e.Value?.ToString() ?? string.Empty;
+        await DebouncedFilterLogsAsync();
+    }
+
+    private async Task DebouncedFilterLogsAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (token.IsCancellationRequested) return;
+            searchText = searchInput;
+            FilterLogs();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage >= TotalPages) return;
+        currentPage++;
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+    }
+
+    private DateTime? ParseHighlightedTimestamp(string? timestampText)
+    {
+        if (string.IsNullOrWhiteSpace(timestampText))
+        {
+            return null;
+        }
+
+        return DateTime.TryParse(
+            timestampText,
+            null,
+            System.Globalization.DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed
+            : null;
+    }
+
+    private bool IsHighlightedLog(AuditLog log)
+    {
+        if (HighlightLogId.HasValue && log.Id == HighlightLogId.Value)
+        {
+            return true;
+        }
+
+        if (!highlightedTimestamp.HasValue)
+        {
+            return false;
+        }
+
+        return Math.Abs((log.Timestamp - highlightedTimestamp.Value).TotalSeconds) < 1;
+    }
+}

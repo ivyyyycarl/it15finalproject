@@ -1,0 +1,334 @@
+@page "/superadmin/tickets/all"
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+@implements IDisposable
+
+<PageTitle>All Tickets - Super Admin</PageTitle>
+
+<div class="space-y-4">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">All Tickets</h1>
+        <p class="text-sm text-gray-500 mt-1">View and manage all support tickets</p>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        </div>
+    }
+    else
+    {
+        <!-- Summary stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div class="bg-gradient-to-b from-blue-50 to-white p-4 rounded-xl shadow-sm border border-blue-100 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Tickets</p>
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-gray-900 mt-2">@_totalTickets</p>
+            </div>
+            <div class="bg-gradient-to-b from-amber-50 to-white p-4 rounded-xl shadow-sm border border-amber-100 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Open</p>
+                    <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-amber-600 mt-2">@_openCount</p>
+            </div>
+            <div class="bg-gradient-to-b from-emerald-50 to-white p-4 rounded-xl shadow-sm border border-emerald-100 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Resolved</p>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-emerald-600 mt-2">@_resolvedCount</p>
+            </div>
+            <div class="bg-gradient-to-b from-red-50 to-white p-4 rounded-xl shadow-sm border border-red-100 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Escalated</p>
+                    <div class="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.9 4h13.8c1.5 0 2.5-1.7 1.7-3L13.7 4c-.8-1.3-2.7-1.3-3.5 0L3.3 16c-.8 1.3.2 3 1.7 3z"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-red-600 mt-2">@_escalatedCount</p>
+            </div>
+        </div>
+
+        <!-- Search and filters -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap gap-4">
+            <input type="text"
+                   placeholder="Search by ticket #, title, or customer..."
+                   class="flex-1 min-w-[200px] px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                   value="@_searchInput"
+                   @oninput="OnSearchInput" />
+            <select class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    @bind="_statusFilter"
+                    @bind:after="FilterTickets">
+                <option value="">All</option>
+                <option value="Open">Open</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Resolved">Resolved</option>
+                <option value="Closed">Closed</option>
+                <option value="Escalated">Escalated</option>
+            </select>
+            <select class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    @bind="_priorityFilter"
+                    @bind:after="FilterTickets">
+                <option value="">All</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+            </select>
+        </div>
+
+        <!-- Tickets table -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b border-gray-100">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket #</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        @foreach (var ticket in PagedFilteredTickets)
+                        {
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">@ticket.TicketNumber</td>
+                                <td class="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title="@ticket.Title">@ticket.Title</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@GetCustomerDisplay(ticket)</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full @GetPriorityClass(ticket.Priority)">
+                                        @ticket.Priority
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full @GetStatusClass(ticket.Status)">
+                                        @ticket.Status
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@GetAssignedAgentDisplay(ticket)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@ticket.CreatedAt.ToString("MMM dd, yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (!_filteredTickets.Any())
+            {
+                <div class="px-6 py-8 text-center text-gray-500">No tickets match your filters.</div>
+            }
+            else
+            {
+                <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <p class="text-sm text-gray-600">
+                        Showing @(((currentPage - 1) * pageSize) + 1)-@Math.Min(currentPage * pageSize, _filteredTickets.Count) of @_filteredTickets.Count · Page @currentPage/@TotalPages
+                    </p>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @onclick="PreviousPage" disabled="@(currentPage <= 1)"
+                                class="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                        <button type="button" @onclick="NextPage" disabled="@(currentPage >= TotalPages)"
+                                class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private List<Ticket> _allTickets = new();
+    private List<Ticket> _filteredTickets = new();
+    private Dictionary<int, string> _agentNameById = new();
+    private string _searchText = "";
+    private string _searchInput = "";
+    private string _statusFilter = "";
+    private string _priorityFilter = "";
+    private CancellationTokenSource? _searchDebounceCts;
+    private int currentPage = 1;
+    private const int pageSize = 15;
+
+    private int _totalTickets => _allTickets.Count;
+    private int _openCount => _allTickets.Count(t => string.Equals(t.Status, "Open", StringComparison.OrdinalIgnoreCase));
+    private int _resolvedCount => _allTickets.Count(t => string.Equals(t.Status, "Resolved", StringComparison.OrdinalIgnoreCase));
+    private int _escalatedCount => _allTickets.Count(t => string.Equals(t.Status, "Escalated", StringComparison.OrdinalIgnoreCase));
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_filteredTickets.Count / (double)pageSize));
+    private List<Ticket> PagedFilteredTickets => _filteredTickets
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var users = await ApiClient.GetUsersAsync();
+        _agentNameById = users?
+            .Where(u => u.Role == UserRole.Agent)
+            .ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.Name) ? $"Agent {u.Id}" : u.Name)
+            ?? new Dictionary<int, string>();
+
+        var result = await ApiClient.GetTicketsAsync();
+        _allTickets = result ?? new List<Ticket>();
+        FilterTickets();
+        _loading = false;
+    }
+
+    private void FilterTickets()
+    {
+        var query = _allTickets.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            var term = _searchText.Trim();
+            query = query.Where(t =>
+                (t.TicketNumber?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (t.Title?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (t.CustomerName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
+        if (!string.IsNullOrWhiteSpace(_statusFilter))
+        {
+            query = query.Where(t => string.Equals(t.Status, _statusFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(_priorityFilter))
+        {
+            query = query.Where(t => string.Equals(t.Priority, _priorityFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        _filteredTickets = query.ToList();
+        currentPage = 1;
+    }
+
+    private void PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage >= TotalPages) return;
+        currentPage++;
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status switch
+        {
+            "Open" => "bg-amber-100 text-amber-800",
+            "In Progress" => "bg-blue-100 text-blue-800",
+            "Resolved" => "bg-green-100 text-green-800",
+            "Closed" => "bg-gray-100 text-gray-800",
+            "Escalated" => "bg-red-100 text-red-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private string GetPriorityClass(string priority)
+    {
+        return priority switch
+        {
+            "Low" => "bg-gray-100 text-gray-800",
+            "Medium" => "bg-blue-100 text-blue-800",
+            "High" => "bg-orange-100 text-orange-800",
+            "Critical" => "bg-red-100 text-red-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private string GetAssignedAgentDisplay(Ticket ticket)
+    {
+        if (ticket.AssignedAgent != null)
+        {
+            var fullName = $"{ticket.AssignedAgent.FirstName} {ticket.AssignedAgent.LastName}".Trim();
+            if (!string.IsNullOrWhiteSpace(fullName))
+            {
+                return fullName;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(ticket.AssignedTo))
+        {
+            return ticket.AssignedTo;
+        }
+
+        if (ticket.AssignedAgentId.HasValue)
+        {
+            if (_agentNameById.TryGetValue(ticket.AssignedAgentId.Value, out var mappedName) && !string.IsNullOrWhiteSpace(mappedName))
+            {
+                return mappedName;
+            }
+
+            return $"Agent {ticket.AssignedAgentId.Value}";
+        }
+
+        return "—";
+    }
+
+    private static string GetCustomerDisplay(Ticket ticket)
+    {
+        if (!string.IsNullOrWhiteSpace(ticket.CustomerName))
+        {
+            return ticket.CustomerName;
+        }
+
+        if (ticket.Customer != null)
+        {
+            var fullName = $"{ticket.Customer.FirstName} {ticket.Customer.LastName}".Trim();
+            if (!string.IsNullOrWhiteSpace(fullName))
+            {
+                return fullName;
+            }
+        }
+
+        return "—";
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _searchInput = e.Value?.ToString() ?? string.Empty;
+        await DebouncedFilterTicketsAsync();
+    }
+
+    private async Task DebouncedFilterTicketsAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (token.IsCancellationRequested) return;
+            _searchText = _searchInput;
+            FilterTickets();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+    }
+}

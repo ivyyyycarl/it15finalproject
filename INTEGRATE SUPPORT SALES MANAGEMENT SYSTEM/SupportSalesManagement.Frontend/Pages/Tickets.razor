@@ -1,0 +1,450 @@
+@page "/tickets"
+@page "/tickets/{ticketId:int}"
+@page "/supervisor/tickets/{ticketId:int}"
+@page "/admin/tickets/{ticketId:int}"
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+@using SupportSalesManagement.Frontend.Models
+@using CustomerModel = SupportSalesManagement.Frontend.Models.Customer
+@using SupportSalesManagement.Frontend.Services
+
+<PageTitle>Tickets</PageTitle>
+
+<div class="px-4 py-6 sm:px-0">
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white @(isSuccess ? "bg-green-600" : "bg-red-600") transition-all duration-300">
+            <div class="flex items-center gap-2">
+                <span>@statusMessage</span>
+                <button @onclick="() => statusMessage = null" class="ml-2 text-white/80 hover:text-white">&times;</button>
+            </div>
+        </div>
+    }
+
+    <div class="mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Support Tickets</h1>
+                <p class="mt-1 text-sm text-gray-600">Manage and track customer support tickets</p>
+            </div>
+            <button @onclick="ShowCreateModal"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md">
+                Create Ticket
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white shadow rounded-lg mb-6 p-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select @bind="selectedStatus"
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">All Status</option>
+                    <option value="Open">Open</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Closed">Closed</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select @bind="selectedPriority"
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">All Priority</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <input type="text" @bind="searchTerm" placeholder="Search tickets..."
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+            </div>
+            <div class="flex items-end">
+                <button @onclick="FilterTickets"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md w-full">
+                    Apply Filters
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tickets List -->
+    <div class="bg-white shadow rounded-lg">
+        @if (isLoading)
+        {
+            <div class="p-8 text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <p class="mt-2 text-gray-600">Loading tickets...</p>
+            </div>
+        }
+        else if (filteredTickets == null || filteredTickets.Count == 0)
+        {
+            <div class="p-8 text-center">
+                <p class="text-gray-600">No tickets found</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Ticket #</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Customer</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Priority</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Created</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @foreach (var ticket in pagedTickets)
+                        {
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">@ticket.TicketNumber
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900">@ticket.Title</div>
+                                        <div class="text-sm text-gray-500 truncate max-w-xs">@ticket.Description</div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @(ticket.Customer?.FirstName + " " + ticket.Customer?.LastName)
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium @(GetStatusColor(ticket.Status))">
+                                        @ticket.Status
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium @(GetPriorityColor(ticket.Priority))">
+                                        @ticket.Priority
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @ticket.CreatedAt.ToString("MMM dd, yyyy")
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button @onclick="() => ViewTicket(ticket.Id)"
+                                        class="text-indigo-600 hover:text-indigo-900 mr-3">View</button>
+                                    <button @onclick="() => EditTicket(ticket)"
+                                        class="text-gray-600 hover:text-gray-900">Edit</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (!TicketId.HasValue && filteredTickets.Any())
+            {
+                <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <p class="text-sm text-gray-600">
+                        Showing @(((currentPage - 1) * pageSize) + 1)-@Math.Min(currentPage * pageSize, filteredTickets.Count) of @filteredTickets.Count · Page @currentPage/@totalPages
+                    </p>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @onclick="PreviousPage" disabled="@(currentPage <= 1)"
+                                class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                        <button type="button" @onclick="NextPage" disabled="@(currentPage >= totalPages)"
+                                class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+@if (showModal)
+{
+    <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                    @(editingTicket != null ? "Edit Ticket" : "Create New Ticket")
+                </h3>
+
+                <form @onsubmit="SaveTicket">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Title</label>
+                            <input type="text" @bind="ticketForm.Title" required
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Description</label>
+                            <textarea @bind="ticketForm.Description" rows="3" required
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Customer</label>
+                            <select @bind="ticketForm.CustomerId" required
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="">Select Customer</option>
+                                @if (customers != null)
+                                {
+                                    @foreach (var customer in customers)
+                                    {
+                                        <option value="@customer.Id">@customer.FirstName @customer.LastName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Priority</label>
+                            <select @bind="ticketForm.Priority" required
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Category</label>
+                            <select @bind="ticketForm.Category" required
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="General">General</option>
+                                <option value="Technical">Technical</option>
+                                <option value="Billing">Billing</option>
+                                <option value="Sales">Sales</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button type="button" @onclick="HideModal"
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-4 rounded-md">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled="@isSaving"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50">
+                            @(isSaving ? "Saving..." : "Save")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Ticket> tickets = new();
+    private List<Ticket> filteredTickets = new();
+    private List<CustomerModel> customers = new();
+    private Ticket? editingTicket;
+    private CreateTicketRequest ticketForm = new();
+    private string selectedStatus = "";
+    private string selectedPriority = "";
+    private string searchTerm = "";
+    private bool isLoading = true;
+    private bool showModal = false;
+    private bool isSaving = false;
+    private string? statusMessage;
+    private bool isSuccess;
+    private int currentPage = 1;
+    private const int pageSize = 25;
+    private int totalPages => Math.Max(1, (int)Math.Ceiling(filteredTickets.Count / (double)pageSize));
+    private List<Ticket> pagedTickets => filteredTickets
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    [Parameter]
+    public int? TicketId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (TicketId.HasValue && tickets.Any())
+        {
+            filteredTickets = tickets.Where(t => t.Id == TicketId.Value).ToList();
+            currentPage = 1;
+        }
+        else if (tickets.Any())
+        {
+            FilterTickets();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            tickets = (await ApiClient.GetTicketsAsync()) ?? new List<Ticket>();
+            customers = (await ApiClient.GetCustomersAsync()) ?? new List<CustomerModel>();
+            
+            if (TicketId.HasValue)
+            {
+                filteredTickets = tickets.Where(t => t.Id == TicketId.Value).ToList();
+                currentPage = 1;
+            }
+            else
+            {
+                filteredTickets = tickets;
+                currentPage = 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading tickets: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void FilterTickets()
+    {
+        filteredTickets = tickets.Where(t =>
+        (string.IsNullOrEmpty(selectedStatus) || t.Status == selectedStatus) &&
+        (string.IsNullOrEmpty(selectedPriority) || t.Priority == selectedPriority) &&
+        (string.IsNullOrEmpty(searchTerm) ||
+        t.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+        t.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+        (t.Customer?.FirstName + " " + t.Customer?.LastName).Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+        ).ToList();
+        currentPage = 1;
+    }
+
+    private void PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage >= totalPages) return;
+        currentPage++;
+    }
+
+    private void ShowCreateModal()
+    {
+        editingTicket = null;
+        ticketForm = new CreateTicketRequest();
+        showModal = true;
+    }
+
+    private void EditTicket(Ticket ticket)
+    {
+        editingTicket = ticket;
+        ticketForm = new CreateTicketRequest
+            {
+                Title = ticket.Title,
+                Description = ticket.Description,
+                CustomerId = ticket.CustomerId,
+                Priority = ticket.Priority,
+                Category = ticket.Category
+            };
+        showModal = true;
+    }
+
+    private void HideModal()
+    {
+        showModal = false;
+        editingTicket = null;
+        ticketForm = new CreateTicketRequest();
+    }
+
+    private async Task SaveTicket()
+    {
+        isSaving = true;
+        try
+        {
+            if (editingTicket != null)
+            {
+                var updateRequest = new UpdateTicketRequest
+                    {
+                        Title = ticketForm.Title,
+                        Description = ticketForm.Description,
+                        Status = editingTicket.Status,
+                        Priority = ticketForm.Priority,
+                        Category = ticketForm.Category,
+                        AssignedAgentId = editingTicket.AssignedAgentId
+                    };
+
+                await ApiClient.UpdateTicketAsync(editingTicket.Id, updateRequest);
+            }
+            else
+            {
+                await ApiClient.CreateTicketAsync(ticketForm);
+            }
+
+            await LoadData();
+            HideModal();
+            _ = ShowStatus("Ticket saved successfully!", true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving ticket: {ex.Message}");
+            _ = ShowStatus("Failed to save ticket. Please try again.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ViewTicket(int ticketId)
+    {
+        NavigationManager.NavigateTo($"/tickets/{ticketId}");
+    }
+
+    private async Task ShowStatus(string message, bool success)
+    {
+        statusMessage = message;
+        isSuccess = success;
+        StateHasChanged();
+        await Task.Delay(3000);
+        statusMessage = null;
+        StateHasChanged();
+    }
+
+    private string GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Open" => "bg-blue-100 text-blue-800",
+            "In Progress" => "bg-yellow-100 text-yellow-800",
+            "Resolved" => "bg-green-100 text-green-800",
+            "Closed" => "bg-gray-100 text-gray-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private string GetPriorityColor(string priority)
+    {
+        return priority switch
+        {
+            "High" => "bg-red-100 text-red-800",
+            "Medium" => "bg-yellow-100 text-yellow-800",
+            "Low" => "bg-green-100 text-green-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+}

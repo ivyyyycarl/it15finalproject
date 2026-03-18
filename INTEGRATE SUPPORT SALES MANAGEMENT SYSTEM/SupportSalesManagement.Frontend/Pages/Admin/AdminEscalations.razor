@@ -1,0 +1,212 @@
+@page "/admin/escalations"
+@page "/escalations"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+
+@using SupportSalesManagement.Frontend.Services
+@using SupportSalesManagement.Frontend.Models
+
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Escalations - Admin</PageTitle>
+
+<div class="space-y-6 p-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Ticket Escalations</h1>
+            <p class="text-gray-500 dark:text-gray-400">Review and resolve high-priority support issues escalated by agents and supervisors.</p>
+        </div>
+        <button @onclick="LoadEscalatedTickets"
+            class="px-4 py-2 bg-white dark:bg-[#2A2A35] border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#32323F] shadow-sm flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            Refresh
+        </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-3 gap-4">
+        <div class="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-100 dark:border-red-900/30">
+            <div class="text-sm text-red-600 dark:text-red-400 font-medium">Critical / High Priority</div>
+            <div class="text-2xl font-bold text-red-800 dark:text-red-300 mt-1">
+                @escalatedTickets.Count(t => t.Priority == "Critical" || t.Priority == "High")
+            </div>
+        </div>
+        <div class="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4 border border-orange-100 dark:border-orange-900/30">
+            <div class="text-sm text-orange-600 dark:text-orange-400 font-medium">Total Escalated</div>
+            <div class="text-2xl font-bold text-orange-800 dark:text-orange-300 mt-1">@escalatedTickets.Count</div>
+        </div>
+        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-100 dark:border-blue-900/30">
+            <div class="text-sm text-blue-600 dark:text-blue-400 font-medium">Pending Resolution</div>
+            <div class="text-2xl font-bold text-blue-800 dark:text-blue-300 mt-1">
+                @escalatedTickets.Count(t => t.Status != "Resolved" && t.Status != "Closed")
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+        </div>
+    }
+    else if (!escalatedTickets.Any())
+    {
+        <div class="text-center py-16 bg-white dark:bg-[#1E1E2D] rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <svg class="w-16 h-16 mx-auto text-green-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 class="text-lg font-bold text-gray-500 dark:text-gray-400">No Escalated Tickets</h3>
+            <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">All tickets are being handled at agent/supervisor level.</p>
+        </div>
+    }
+    else
+    {
+        <div class="space-y-4">
+            @foreach (var ticket in escalatedTickets)
+            {
+                var borderColor = ticket.Priority == "Critical" ? "border-l-red-500" : 
+                                  ticket.Priority == "High" ? "border-l-orange-500" : "border-l-yellow-500";
+                var iconBg = ticket.Priority == "Critical" ? "bg-red-50 dark:bg-red-900/30" : 
+                             ticket.Priority == "High" ? "bg-orange-50 dark:bg-orange-900/30" : "bg-yellow-50 dark:bg-yellow-900/30";
+                var iconColor = ticket.Priority == "Critical" ? "text-red-500" : 
+                                ticket.Priority == "High" ? "text-orange-500" : "text-yellow-500";
+
+                <div class="bg-white dark:bg-[#1E1E2D] p-6 rounded-xl shadow-sm border border-l-4 @borderColor border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div class="flex gap-4">
+                            <div class="p-3 @iconBg rounded-full h-fit">
+                                <svg class="w-6 h-6 @iconColor" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900 dark:text-white">@ticket.Title</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                    @ticket.TicketNumber &bull; 
+                                    Customer: @(ticket.Customer != null ? $"{ticket.Customer.FirstName} {ticket.Customer.LastName}" : $"#{ticket.CustomerId}")
+                                </p>
+                                <div class="flex gap-2 mt-3">
+                                    <span class="px-2 py-1 text-xs rounded font-bold @GetPriorityClass(ticket.Priority)">@ticket.Priority</span>
+                                    <span class="px-2 py-1 text-xs rounded font-bold @GetStatusClass(ticket.Status)">@ticket.Status</span>
+                                    <span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs rounded font-medium">@ticket.Category</span>
+                                    @if (ticket.RelatedCallId.HasValue)
+                                    {
+                                        <span class="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded font-medium">
+                                            Call #@ticket.RelatedCallId
+                                        </span>
+                                    }
+                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mt-3">@ticket.Description</p>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0 ml-4">
+                            <p class="text-xs text-gray-400">Escalated</p>
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">@GetTimeAgo(ticket.UpdatedAt ?? ticket.CreatedAt)</p>
+                            <div class="flex flex-col gap-2 mt-3">
+                                <button @onclick="() => ResolveTicket(ticket)"
+                                    class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
+                                    Resolve
+                                </button>
+                                <button @onclick="() => AssignToAgent(ticket)"
+                                    class="px-4 py-2 bg-gray-900 dark:bg-gray-200 text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-800 dark:hover:bg-gray-300 transition-colors">
+                                    Reassign
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Ticket> escalatedTickets = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEscalatedTickets();
+    }
+
+    private async Task LoadEscalatedTickets()
+    {
+        isLoading = true;
+        try
+        {
+            var allTickets = await ApiClient.GetTicketsAsync();
+            if (allTickets != null)
+            {
+                // Filter for escalated tickets (high priority, critical, or explicitly escalated status)
+                escalatedTickets = allTickets
+                    .Where(t => t.Priority == "Critical" || t.Priority == "High" || 
+                                t.Status == "Escalated" || t.Status == "PendingCustomer")
+                    .OrderByDescending(t => t.Priority == "Critical" ? 0 : t.Priority == "High" ? 1 : 2)
+                    .ThenByDescending(t => t.CreatedAt)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading escalated tickets: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ResolveTicket(Ticket ticket)
+    {
+        try
+        {
+            var update = new UpdateTicketRequest
+            {
+                Title = ticket.Title,
+                Description = ticket.Description,
+                Status = "Resolved",
+                Priority = ticket.Priority,
+                Category = ticket.Category
+            };
+            await ApiClient.UpdateTicketAsync(ticket.Id, update);
+            await LoadEscalatedTickets();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error resolving ticket: {ex.Message}");
+        }
+    }
+
+    private void AssignToAgent(Ticket ticket)
+    {
+        // For now, navigate to the supervisor tickets page where proper assignment UI exists
+        NavigationManager.NavigateTo($"/supervisor/tickets");
+    }
+
+    private string GetPriorityClass(string priority) => priority switch
+    {
+        "Critical" => "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+        "High" => "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+        "Medium" => "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+        "Low" => "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+        _ => "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+    };
+
+    private string GetStatusClass(string status) => status switch
+    {
+        "Open" => "bg-blue-100 text-blue-700",
+        "InProgress" or "In Progress" => "bg-purple-100 text-purple-700",
+        "Resolved" => "bg-green-100 text-green-700",
+        "Escalated" => "bg-red-100 text-red-700",
+        _ => "bg-gray-100 text-gray-700"
+    };
+
+    private string GetTimeAgo(DateTime date)
+    {
+        var span = DateTime.UtcNow - date;
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
+        return $"{(int)span.TotalDays}d ago";
+    }
+}

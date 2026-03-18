@@ -1,0 +1,30 @@
+@* NavSubItem.razor - Submenu item component *@
+@inject NavigationManager NavigationManager
+
+<a href="@Href" class="@GetClasses()">
+    <span class="flex-1 truncate text-sm">@Label</span>
+    @if (BadgeCount > 0)
+    {
+        <span class="@BadgeColor text-white px-2 py-0.5 text-[10px] font-bold rounded-full">
+            @BadgeCount
+        </span>
+    }
+</a>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Href { get; set; } = "#";
+    [Parameter] public int BadgeCount { get; set; }
+    [Parameter] public string BadgeColor { get; set; } = "bg-[#F59E0B]";
+
+    private string GetClasses()
+    {
+        var isActive = NavigationManager.Uri.Contains(Href, StringComparison.OrdinalIgnoreCase);
+        var baseClasses = "flex items-center gap-2 py-2 px-3 rounded-md transition-all duration-200";
+        var stateClasses = isActive
+        ? "bg-white/10 text-white font-medium"
+        : "text-white/70 hover:text-white hover:bg-white/5";
+
+        return $"{baseClasses} {stateClasses}";
+    }
+}

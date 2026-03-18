@@ -1,0 +1,411 @@
+@page "/admin/products/edit/{Id:int}"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit Product - @(product?.Name ?? "Loading...")</PageTitle>
+
+<div class="px-6 py-8">
+    <div class="max-w-full mx-auto">
+        <!-- Header -->
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <button @onclick="GoBack" class="text-sm text-gray-500 hover:text-gray-900 mb-2 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Back to Products
+                </button>
+                <h1 class="text-2xl font-bold text-gray-900">Edit Item</h1>
+                <p class="mt-1 text-sm text-gray-500">Update product details and inventory.</p>
+            </div>
+        </div>
+
+        @if (isLoading)
+        {
+                <div class="flex justify-center py-12">
+                    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                </div>
+        }
+        else if (product == null)
+        {
+                 <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-red-700">Product not found or failed to load.</p>
+                        </div>
+                    </div>
+                </div>
+        }
+        else
+        {
+                <!-- Form Card -->
+                <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="p-6 md:p-8">
+                        <EditForm Model="@updateModel" OnValidSubmit="HandleSubmit">
+                            <DataAnnotationsValidator />
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                                    <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4">
+                                        <div class="flex">
+                                            <div class="flex-shrink-0">
+                                                <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                            <div class="ml-3">
+                                                <p class="text-sm text-red-700">@errorMessage</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                        }
+
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                <!-- Left Column: Image -->
+                                <div class="lg:col-span-1">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Product Picture</label>
+                                    <div
+                                        class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:bg-gray-100 transition-colors">
+                                        <div class="relative mb-4">
+                                        @if (!string.IsNullOrEmpty(updateModel.ImageUrl))
+                                        {
+                                                    <img src="@updateModel.ImageUrl" alt="Product preview"
+                                                        class="h-48 w-48 object-cover rounded-lg shadow-sm" />
+                                                    <button type="button" @onclick="ClearImage"
+                                                        class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                        }
+                                        else
+                                        {
+                                                    <div class="h-48 w-48 bg-gray-200 rounded-lg flex items-center justify-center">
+                                                        <svg class="h-16 w-16 text-gray-400" fill="none" stroke="currentColor"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                        </svg>
+                                                    </div>
+                                        }
+                                        </div>
+                                        <div class="text-center">
+                                            <InputFile OnChange="HandleImageUpload" class="hidden" id="file-upload"
+                                                accept=".jpg,.jpeg,.png,.webp" />
+                                            <label for="file-upload"
+                                                class="cursor-pointer bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                            @(isUploading ? "Uploading..." : "Change Photo")
+                                            </label>
+                                            <p class="mt-2 text-xs text-gray-500">JPG, PNG, WebP up to 10MB</p>
+                                        @if (!string.IsNullOrEmpty(uploadError))
+                                        {
+                                                    <p class="mt-1 text-xs text-red-500">@uploadError</p>
+                                        }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right Column: Details -->
+                                <div class="lg:col-span-2 space-y-6">
+                                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <!-- Product Name -->
+                                        <div class="sm:col-span-2">
+                                            <label class="block text-sm font-medium text-gray-700">Product Name *</label>
+                                            <div class="mt-1">
+                                                <InputText @bind-Value="updateModel.Name"
+                                                    class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    placeholder="e.g. Vintage Leather Jacket" />
+                                                <ValidationMessage For="@(() => updateModel.Name)"
+                                                    class="text-red-500 text-xs mt-1" />
+                                            </div>
+                                        </div>
+
+                                        <!-- SKU Code (ReadOnly) -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">SKU Code</label>
+                                            <div class="mt-1">
+                                                <input type="text" value="@product.SKU" readonly
+                                                    class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-500 cursor-not-allowed sm:text-sm" />
+                                            </div>
+                                        </div>
+
+                                        <!-- Price -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Price (₱) *</label>
+                                            <div class="mt-1 relative rounded-md shadow-sm">
+                                                <div
+                                                    class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                    <span class="text-gray-500 sm:text-sm">₱</span>
+                                                </div>
+                                                <InputNumber @bind-Value="updateModel.Price"
+                                                    class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 pl-7 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    placeholder="0.00" />
+                                            </div>
+                                        </div>
+
+                                        <!-- Stock -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Current Stock *</label>
+                                            <div class="mt-1">
+                                                <InputNumber @bind-Value="updateModel.StockQuantity"
+                                                    class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    placeholder="0" />
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Min Stock Level -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Min Stock Level *</label>
+                                            <div class="mt-1">
+                                                <InputNumber @bind-Value="updateModel.MinStockLevel"
+                                                    class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    placeholder="5" />
+                                            </div>
+                                        </div>
+
+                                         <!-- Category -->
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Category</label>
+                                            <div class="mt-1">
+                                                <select @bind="updateModel.Category"
+                                                    class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                                    <option value="TShirt">T-Shirt</option>
+                                                    <option value="Dress">Dress</option>
+                                                    <option value="Jacket">Jacket</option>
+                                                    <option value="Sweater">Sweater</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <!-- Status -->
+                                        <div class="flex items-center h-full pt-6">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="isActive"
+                                                    checked="@(updateModel.IsActive ?? false)"
+                                                    @onchange="OnIsActiveChanged"
+                                                    class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded" />
+                                                <label for="isActive" class="ml-2 block text-sm text-gray-900">Active
+                                                    Product</label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Description -->
+                                        <div class="sm:col-span-2">
+                                            <label class="block text-sm font-medium text-gray-700">Description</label>
+                                            <div class="mt-1">
+                                                <InputTextArea @bind-Value="updateModel.Description" rows="4"
+                                                    class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                    placeholder="Detailed product description..." />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="mt-8 pt-5 border-t border-gray-200 flex justify-end">
+                                <button type="button" @onclick="GoBack"
+                                    class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-3">
+                                    Cancel
+                                </button>
+                                <button type="submit" disabled="@isSubmitting"
+                                    class="bg-blue-600 border border-transparent rounded-md shadow-sm py-2 px-4 inline-flex justify-center text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
+                                @if (isSubmitting)
+                                {
+                                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                    stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                </path>
+                                            </svg>
+                                            <span>Saving...</span>
+                                }
+                                else
+                                {
+                                            <span>Save Changes</span>
+                                }
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Product? product;
+    private UpdateProductRequest updateModel = new();
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private bool isUploading = false;
+    private string? errorMessage;
+    private string? uploadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProduct();
+    }
+
+    private async Task LoadProduct()
+    {
+        isLoading = true;
+        try
+        {
+     
+            var products = await ApiClient.GetProductsAsync();
+            product = products?.FirstOrDefault(p => p.Id == Id);
+
+            if (product != null)
+            {
+                updateModel = new UpdateProductRequest
+                    {
+                        Name = product.Name,
+                        Description = product.Description,
+                        Category = product.Category,
+                        Price = product.Price,
+                        StockQuantity = product.StockQuantity,
+                        MinStockLevel = product.MinStockLevel,
+                        ImageUrl = product.ImageUrl,
+                        IsActive = product.IsActive
+                    };
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading product: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        isUploading = true;
+        uploadError = null;
+
+        try
+        {
+            var file = e.File;
+            if (file != null)
+            {
+                var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp" };
+                if (!allowedTypes.Contains(file.ContentType))
+                {
+                    uploadError = "Invalid file type. Please upload a JPG, PNG, or WebP image.";
+                    return;
+                }
+
+                if (file.Size > 10 * 1024 * 1024)
+                {
+                    uploadError = "File size exceeds 10MB limit.";
+                    return;
+                }
+
+                var (imageUrl, error) = await ApiClient.UploadImageAsync(file);
+                if (!string.IsNullOrEmpty(imageUrl))
+                {
+                    updateModel.ImageUrl = imageUrl;
+                }
+                else
+                {
+                    uploadError = error ?? "Failed to upload image.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Error uploading image: {ex.Message}";
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private void ClearImage()
+    {
+        updateModel.ImageUrl = null;
+        uploadError = null;
+    }
+
+    private void OnIsActiveChanged(ChangeEventArgs e)
+    {
+        if (e.Value is bool value)
+        {
+            updateModel.IsActive = value;
+            return;
+        }
+
+        if (bool.TryParse(e.Value?.ToString(), out var parsed))
+        {
+            updateModel.IsActive = parsed;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/admin/products");
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+
+        try
+        {
+            var result = await ApiClient.UpdateProductAsync(Id, updateModel);
+            if (result.Product != null)
+            {
+                // Update local product and model to reflect changes and allow subsequent edits
+                product = result.Product;
+                updateModel = new UpdateProductRequest
+                {
+                    Name = product.Name,
+                    Description = product.Description,
+                    Category = product.Category,
+                    Price = product.Price,
+                    StockQuantity = product.StockQuantity,
+                    MinStockLevel = product.MinStockLevel,
+                    ImageUrl = product.ImageUrl,
+                    IsActive = product.IsActive,
+                    SKU = product.SKU
+                };
+                
+                NavigationManager.NavigateTo("/admin/products");
+            }
+            else
+            {
+                errorMessage = result.Error ?? "Failed to update product. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An unexpected error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

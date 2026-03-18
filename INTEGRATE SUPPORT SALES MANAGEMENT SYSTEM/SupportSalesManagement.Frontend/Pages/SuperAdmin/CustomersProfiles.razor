@@ -1,0 +1,257 @@
+@page "/superadmin/customers/profiles"
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@using SupportSalesManagement.Frontend.Services
+@using SupportSalesManagement.Frontend.Models
+@inject ApiClient ApiClient
+@implements IDisposable
+
+<PageTitle>Customer Profiles - Super Admin</PageTitle>
+
+<div class="space-y-4">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">Customer Profiles</h1>
+        <p class="text-sm text-gray-500 mt-1">View and manage all customer records.</p>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        </div>
+    }
+    else
+    {
+        <!-- Summary stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div class="bg-gradient-to-b from-blue-50 to-white p-4 rounded-xl shadow-sm border border-blue-100 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Customers</p>
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2a5 5 0 0110 0v2M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-gray-900 mt-2">@_totalCustomers</p>
+            </div>
+            <div class="bg-gradient-to-b from-indigo-50 to-white p-4 rounded-xl shadow-sm border border-indigo-100 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">New This Month</p>
+                    <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-indigo-700 mt-2">@_newThisMonth</p>
+            </div>
+            <div class="bg-gradient-to-b from-emerald-50 to-white p-4 rounded-xl shadow-sm border border-emerald-100 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</p>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-emerald-700 mt-2">@_totalOrders</p>
+            </div>
+            <div class="bg-gradient-to-b from-violet-50 to-white p-4 rounded-xl shadow-sm border border-violet-100 ui-uniform-card">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Revenue</p>
+                    <div class="w-8 h-8 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center">
+                        <span class="text-lg font-black leading-none">₱</span>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-violet-700 mt-2">₱@_totalRevenue.ToString("N2")</p>
+            </div>
+        </div>
+
+        <!-- Search bar -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </div>
+                <input type="text"
+                       class="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                       placeholder="Search by name or email..."
+                       value="@_searchInput"
+                       @oninput="OnSearchInput" />
+            </div>
+        </div>
+
+        <!-- Customers table -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b border-gray-100">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">City</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ownership</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Spent</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member Since</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        @foreach (var c in PagedFilteredCustomers)
+                        {
+                            var ordersForCustomer = _ordersByCustomer.GetValueOrDefault(c.Id) ?? new List<Order>();
+                            var orderCount = ordersForCustomer.Count;
+                            var totalSpent = ordersForCustomer.Sum(o => o.TotalAmount);
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="text-sm font-medium text-gray-900">@(c.FirstName + " " + c.LastName)</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">@c.Email</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">@(string.IsNullOrWhiteSpace(c.Phone) ? "—" : c.Phone)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">@(string.IsNullOrWhiteSpace(c.City) ? "—" : c.City)</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold @GetOwnershipClass(c)">
+                                        @GetOwnershipText(c)
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">@orderCount</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">₱@totalSpent.ToString("N2")</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">@c.CreatedAt.ToString("MMM d, yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (!FilteredCustomersList.Any())
+            {
+                <div class="p-12 text-center text-gray-500">
+                    <p>No customers found@(string.IsNullOrWhiteSpace(_searchText) ? "." : " matching your search.")</p>
+                </div>
+            }
+            else
+            {
+                <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <p class="text-sm text-gray-600">
+                        Showing @(((currentPage - 1) * pageSize) + 1)-@Math.Min(currentPage * pageSize, FilteredCustomersList.Count) of @FilteredCustomersList.Count · Page @currentPage/@TotalPages
+                    </p>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @onclick="PreviousPage" disabled="@(currentPage <= 1)"
+                                class="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                        <button type="button" @onclick="NextPage" disabled="@(currentPage >= TotalPages)"
+                                class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private List<Customer> _customers = new();
+    private List<Order> _orders = new();
+    private Dictionary<int, List<Order>> _ordersByCustomer = new();
+    private string _searchText = string.Empty;
+    private string _searchInput = string.Empty;
+    private CancellationTokenSource? _searchDebounceCts;
+    private int currentPage = 1;
+    private const int pageSize = 15;
+
+    private int _totalCustomers => _customers.Count;
+    private int _newThisMonth => _customers.Count(c => c.CreatedAt.Year == DateTime.Now.Year && c.CreatedAt.Month == DateTime.Now.Month);
+    private int _totalOrders => _orders.Count;
+    private decimal _totalRevenue => _orders.Sum(o => o.TotalAmount);
+
+    private IEnumerable<Customer> _filteredCustomers
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_searchText))
+                return _customers;
+            var q = _searchText.Trim().ToLowerInvariant();
+            return _customers.Where(c =>
+                (c.FirstName?.ToLowerInvariant().Contains(q) ?? false) ||
+                (c.LastName?.ToLowerInvariant().Contains(q) ?? false) ||
+                (c.Email?.ToLowerInvariant().Contains(q) ?? false));
+        }
+    }
+    private List<Customer> FilteredCustomersList => _filteredCustomers.ToList();
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredCustomersList.Count / (double)pageSize));
+    private List<Customer> PagedFilteredCustomers => FilteredCustomersList
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var customersTask = ApiClient.GetCustomersAsync();
+        var ordersTask = ApiClient.GetOrdersAsync();
+        await Task.WhenAll(customersTask, ordersTask);
+
+        _customers = await customersTask ?? new List<Customer>();
+        _orders = await ordersTask ?? new List<Order>();
+        _ordersByCustomer = _orders
+            .Where(o => o.CustomerId > 0)
+            .GroupBy(o => o.CustomerId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        _loading = false;
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _searchInput = e.Value?.ToString() ?? string.Empty;
+        await DebouncedApplySearchAsync();
+    }
+
+    private async Task DebouncedApplySearchAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (token.IsCancellationRequested) return;
+            _searchText = _searchInput;
+            currentPage = 1;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage >= TotalPages) return;
+        currentPage++;
+    }
+
+    private static string GetOwnershipText(Customer customer)
+    {
+        if (customer.UserId.HasValue)
+            return "Linked Account";
+        if (customer.CreatedByUserId.HasValue)
+            return "Branch Created";
+        return "Legacy";
+    }
+
+    private static string GetOwnershipClass(Customer customer)
+    {
+        if (customer.UserId.HasValue)
+            return "bg-blue-100 text-blue-700";
+        if (customer.CreatedByUserId.HasValue)
+            return "bg-emerald-100 text-emerald-700";
+        return "bg-gray-100 text-gray-700";
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+    }
+}

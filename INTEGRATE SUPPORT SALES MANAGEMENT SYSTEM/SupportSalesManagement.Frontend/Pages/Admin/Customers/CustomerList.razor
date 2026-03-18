@@ -1,0 +1,515 @@
+@page "/admin/customers"
+@page "/admin/customers/history"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<PageTitle>Admin - Customer Management</PageTitle>
+
+<div class="px-6 py-8">
+    <div class="mb-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Customer Management</h1>
+            <p class="mt-1 text-sm text-gray-500">Manage customer profiles and view histories</p>
+        </div>
+        <div class="flex space-x-3">
+        </div>
+    </div>
+
+    <!-- View Tabs -->
+    <div class="flex items-center gap-6 border-b border-gray-200 mb-6">
+        <button
+            class="pb-3 px-1 font-bold text-sm transition-all relative @(CurrentView == "List" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")"
+            @onclick='() => SwitchView("List")'>
+            Search Profiles
+            @if(CurrentView == "List") { <span class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span> }
+        </button>
+        <button
+            class="pb-3 px-1 font-bold text-sm transition-all relative @(CurrentView == "History" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")"
+            @onclick='() => SwitchView("History")'>
+            Activity History
+            @if(CurrentView == "History") { <span class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span> }
+        </button>
+    </div>
+
+    @if (CurrentView == "List")
+    {
+        <!-- Search/Filter -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="relative md:col-span-2">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </div>
+                <input type="text" value="@SearchQuery" @oninput="OnSearchInput"
+                    class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                    placeholder="Search by name, email, company or phone..." />
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div class="flex items-center">
+                    <div class="p-3 bg-blue-100 rounded-lg text-blue-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Total Customers</p>
+                        <p class="text-2xl font-semibold text-gray-900">@AllCustomers.Count</p>
+                    </div>
+                </div>
+            </div>
+             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div class="flex items-center">
+                    <div class="p-3 bg-green-100 rounded-lg text-green-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Active</p>
+                        <p class="text-2xl font-semibold text-gray-900">@AllCustomers.Count(c => c.IsActive)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            @if (isLoading)
+            {
+                <div class="p-12 flex justify-center">
+                    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                </div>
+            }
+            else if (!FilteredCustomers.Any())
+            {
+                <div class="p-12 text-center text-gray-500">
+                    <p>No customers found matching your search.</p>
+                </div>
+            }
+            else
+            {
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <button @onclick='() => SetSort("name")' class="inline-flex items-center gap-1 hover:text-blue-600">
+                                        Customer Info <span class="text-[10px]">@GetSortIndicator("name")</span>
+                                    </button>
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <button @onclick='() => SetSort("email")' class="inline-flex items-center gap-1 hover:text-blue-600">
+                                        Contact <span class="text-[10px]">@GetSortIndicator("email")</span>
+                                    </button>
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @foreach (var customer in FilteredCustomers)
+                            {
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
+                                                @customer.FirstName.FirstOrDefault()@customer.LastName.FirstOrDefault()
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-gray-900">@customer.FirstName @customer.LastName</div>
+                                                <div class="text-xs text-gray-500">@customer.Company</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">@customer.Email</div>
+                                        <div class="text-xs text-gray-500">@customer.Phone</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                            @customer.CustomerType
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border border-violet-100 bg-violet-50 text-violet-700">
+                                            @GetCustomerBranchLabel(customer)
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        @if(customer.IsActive)
+                                        {
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                Active
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                Inactive
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button class="text-blue-600 hover:text-blue-900 mr-3">Edit</button>
+                                        <button class="text-indigo-600 hover:text-indigo-900">History</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                    <p class="text-sm text-gray-500">Showing @(FilteredCustomers.Any() ? (((currentPage - 1) * pageSize) + 1) : 0)-@Math.Min(currentPage * pageSize, totalCustomerCount) of @totalCustomerCount customers · Page @currentPage/@totalPages</p>
+                    <div class="flex items-center gap-2">
+                        <button @onclick="PreviousPage" disabled="@(currentPage <= 1)"
+                            class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                            Previous
+                        </button>
+                        <button @onclick="NextPage" disabled="@(currentPage >= totalPages)"
+                            class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+         <div class="flex flex-col h-full overflow-hidden">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <h2 class="text-lg font-bold text-gray-900 mb-6">Recent Customer Activity (Global Feed)</h2>
+                @if (isLoadingHistory)
+                {
+                    <div class="p-12 flex justify-center">
+                        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                    </div>
+                }
+                else if (!GlobalTimeline.Any())
+                {
+                    <div class="p-12 text-center text-gray-500">
+                        <p>No activity found.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 before:to-transparent">
+                        @foreach (var item in GlobalTimeline)
+                        {
+                            <div class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                                <div class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-gray-50 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 text-gray-500">
+                                    @if(item.Type == "Order") { <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg> }
+                                    else if (item.Type == "Ticket") { <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> }
+                                    else {  <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg> }
+                                </div>
+                                
+                                <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
+                                    <div class="flex items-center justify-between space-x-2 mb-1">
+                                        <div class="font-bold text-gray-900">@item.Title</div>
+                                        <time class="font-mono text-xs text-gray-500">@item.TimeAgo</time>
+                                    </div>
+                                    <div class="text-sm text-gray-500 mb-2">
+                                        <span class="font-medium text-blue-600">@item.CustomerName</span> - @item.Description
+                                    </div>
+                                    <button class="text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors">Details &rarr;</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Customer> AllCustomers = new();
+    private string SearchQuery = "";
+    private bool isLoading = true;
+    private bool isLoadingHistory = false;
+    private string CurrentView = "List";
+    private List<TimelineItem> GlobalTimeline = new();
+    private int currentPage = 1;
+    private int pageSize = 25;
+    private int totalPages = 1;
+    private int totalCustomerCount = 0;
+    private string sortBy = "name";
+    private string sortDir = "asc";
+    private CancellationTokenSource? _searchDebounceCts;
+    private Dictionary<int, string> customerBranchLabels = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    protected override void OnParametersSet()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).ToLower();
+
+        if (relativePath.Contains("history"))
+        {
+            SwitchView("History", false);
+        }
+        else
+        {
+            if(CurrentView != "List") SwitchView("List", false);
+        }
+    }
+
+    private async void SwitchView(string view, bool updateUrl = true)
+    {
+        CurrentView = view;
+        if(updateUrl)
+        {
+            if (view == "History") NavigationManager.NavigateTo("/admin/customers/history");
+            else NavigationManager.NavigateTo("/admin/customers");
+        }
+        
+        if (view == "History" && !GlobalTimeline.Any())
+        {
+            await LoadHistoryData();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await ApiClient.GetCustomersPagedAsync(currentPage, pageSize, SearchQuery, sortBy, sortDir);
+            if (result != null)
+            {
+                AllCustomers = result.Items;
+                totalCustomerCount = result.TotalCount;
+                totalPages = Math.Max(1, result.TotalPages);
+                await BuildCustomerBranchMapAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading customers: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task FilterCustomers()
+    {
+        currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task SetSort(string field)
+    {
+        if (string.Equals(sortBy, field, StringComparison.OrdinalIgnoreCase))
+        {
+            sortDir = sortDir == "asc" ? "desc" : "asc";
+        }
+        else
+        {
+            sortBy = field;
+            sortDir = "asc";
+        }
+
+        await FilterCustomers();
+    }
+
+    private string GetSortIndicator(string field)
+    {
+        if (!string.Equals(sortBy, field, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return sortDir == "asc" ? "ASC" : "DESC";
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        SearchQuery = e.Value?.ToString() ?? string.Empty;
+        await DebouncedFilterCustomersAsync();
+    }
+
+    private async Task DebouncedFilterCustomersAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (token.IsCancellationRequested) return;
+            await FilterCustomers();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private async Task PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+        await LoadData();
+    }
+
+    private async Task NextPage()
+    {
+        if (currentPage >= totalPages) return;
+        currentPage++;
+        await LoadData();
+    }
+
+    private async Task LoadHistoryData()
+    {
+        isLoadingHistory = true;
+        try
+        {
+            var ordersTask = ApiClient.GetOrdersAsync();
+            var ticketsTask = ApiClient.GetTicketsAsync();
+            
+            await Task.WhenAll(ordersTask, ticketsTask);
+            
+            var orders = await ordersTask;
+            var tickets = await ticketsTask;
+            
+            GlobalTimeline = new List<TimelineItem>();
+            
+            // Add orders to timeline
+            if (orders != null)
+            {
+                foreach (var order in orders)
+                {
+                    GlobalTimeline.Add(new TimelineItem
+                    {
+                        Type = "Order",
+                        Title = $"Order #{order.OrderNumber} - {order.Status}",
+                        CustomerName = string.IsNullOrEmpty(order.CustomerName) ? $"Customer #{order.CustomerId}" : order.CustomerName,
+                        Description = $"Total: ₱{order.TotalAmount:N2}",
+                        Date = order.OrderDate,
+                        TimeAgo = GetTimeAgo(order.OrderDate)
+                    });
+                }
+            }
+            
+            // Add tickets to timeline
+            if (tickets != null)
+            {
+                foreach (var ticket in tickets)
+                {
+                    GlobalTimeline.Add(new TimelineItem
+                    {
+                        Type = "Ticket",
+                        Title = $"Ticket #{ticket.TicketNumber}: {ticket.Title}",
+                        CustomerName = string.IsNullOrEmpty(ticket.CustomerName) ? $"Customer #{ticket.CustomerId}" : ticket.CustomerName,
+                        Description = $"Status: {ticket.Status}, Priority: {ticket.Priority}",
+                        Date = ticket.CreatedAt,
+                        TimeAgo = GetTimeAgo(ticket.CreatedAt)
+                    });
+                }
+            }
+            
+            // Sort by date descending
+            GlobalTimeline = GlobalTimeline.OrderByDescending(t => t.Date).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading history: {ex.Message}");
+            GlobalTimeline = new List<TimelineItem>();
+        }
+        finally
+        {
+            isLoadingHistory = false;
+        }
+    }
+
+    private string GetTimeAgo(DateTime date)
+    {
+        var timeSpan = DateTime.UtcNow - date;
+        
+        if (timeSpan.TotalMinutes < 1)
+            return "just now";
+        if (timeSpan.TotalMinutes < 60)
+            return $"{(int)timeSpan.TotalMinutes} {(timeSpan.TotalMinutes < 2 ? "min" : "mins")} ago";
+        if (timeSpan.TotalHours < 24)
+            return $"{(int)timeSpan.TotalHours} {(timeSpan.TotalHours < 2 ? "hour" : "hours")} ago";
+        if (timeSpan.TotalDays < 30)
+            return $"{(int)timeSpan.TotalDays} {(timeSpan.TotalDays < 2 ? "day" : "days")} ago";
+        if (timeSpan.TotalDays < 365)
+            return $"{(int)(timeSpan.TotalDays / 30)} {(timeSpan.TotalDays / 30 < 2 ? "month" : "months")} ago";
+        return $"{(int)(timeSpan.TotalDays / 365)} {(timeSpan.TotalDays / 365 < 2 ? "year" : "years")} ago";
+    }
+
+    private IEnumerable<Customer> FilteredCustomers => AllCustomers;
+
+    private async Task BuildCustomerBranchMapAsync()
+    {
+        customerBranchLabels = new Dictionary<int, string>();
+
+        try
+        {
+            var users = await ApiClient.GetUsersAsync();
+            if (users == null)
+            {
+                return;
+            }
+
+            var usersById = users.ToDictionary(u => u.Id);
+            foreach (var customer in AllCustomers)
+            {
+                if (customer.UserId is int userId && usersById.TryGetValue(userId, out var user))
+                {
+                    customerBranchLabels[customer.Id] = FormatBranchLabel(user.BranchId, user.BranchName);
+                }
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private string GetCustomerBranchLabel(Customer customer)
+    {
+        return customerBranchLabels.TryGetValue(customer.Id, out var label) ? label : "Unassigned";
+    }
+
+    private static string FormatBranchLabel(int? branchId, string? branchName)
+    {
+        if (branchId is null || branchId <= 0)
+        {
+            return "Unassigned";
+        }
+
+        var normalizedName = string.IsNullOrWhiteSpace(branchName) ? null : branchName.Trim();
+        return normalizedName is null ? $"#{branchId}" : $"{normalizedName} (#{branchId})";
+    }
+
+    private class TimelineItem
+    {
+        public string Type { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public string TimeAgo { get; set; } = string.Empty;
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+    }
+}

@@ -1,0 +1,251 @@
+@page "/module-disabled"
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject AuthenticationService AuthService
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Module Disabled</PageTitle>
+
+<div class="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div class="max-w-lg w-full bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center">
+        <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">Module Disabled</h1>
+        <p class="text-gray-600 mb-4">
+            This module is not available under your current role/subscription access policy.
+        </p>
+        @if (!string.IsNullOrWhiteSpace(entitlement?.Message))
+        {
+            <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                @entitlement.Message
+            </p>
+        }
+        @if (!string.IsNullOrWhiteSpace(ModuleKey))
+        {
+            <p class="text-sm text-gray-500 mb-6">
+                Module key: <span class="font-semibold text-gray-700">@ModuleKey</span>
+            </p>
+        }
+        <div class="flex items-center justify-center gap-2 flex-wrap">
+            <a href="@fallbackRoute" class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors">
+                Go to Dashboard
+            </a>
+            @if (entitlement?.ReasonCode is "plan_excluded" or "quota_exceeded")
+            {
+                <a href="/subscription/overview"
+                   class="inline-flex items-center justify-center px-6 py-3 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition-colors">
+                    View Upgrade Options
+                </a>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private ModuleAccessConfig? moduleAccessConfig;
+    private TenantSubscriptionModel? tenantSubscription;
+    private ModuleEntitlementResultModel? entitlement;
+    private string fallbackRoute = "/dashboard";
+
+    [SupplyParameterFromQuery(Name = "module")]
+    public string? ModuleKey { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        fallbackRoute = GetRoleDefaultRoute();
+
+        try
+        {
+            moduleAccessConfig = await ApiClient.GetModuleAccessConfigAsync();
+            tenantSubscription = await ApiClient.GetMySubscriptionAsync();
+            if (!string.IsNullOrWhiteSpace(ModuleKey))
+            {
+                entitlement = await ApiClient.GetModuleEntitlementAsync(ModuleKey);
+            }
+            fallbackRoute = ResolveSafeFallbackRoute();
+        }
+        catch
+        {
+            fallbackRoute = GetRoleDefaultRoute();
+        }
+    }
+
+    private string ResolveSafeFallbackRoute()
+    {
+        var role = AuthService.CurrentUser?.Role;
+        if (role == null)
+        {
+            return "/dashboard";
+        }
+
+        var orderedModules = new[] { "dashboard", "tickets", "orders", "customers", "catalog", "reports", "notifications", "iam", "integrations", "calls" };
+        foreach (var moduleKey in orderedModules)
+        {
+            if (!IsAllowedForRole(moduleKey, role.Value))
+            {
+                continue;
+            }
+
+            if (!IsAllowedBySubscription(moduleKey))
+            {
+                continue;
+            }
+
+            var route = GetModuleRouteForRole(moduleKey, role.Value);
+            if (!string.IsNullOrWhiteSpace(route))
+            {
+                return route;
+            }
+        }
+
+        return GetRoleDefaultRoute();
+    }
+
+    private bool IsAllowedForRole(string moduleKey, UserRole role)
+    {
+        if (role == UserRole.SuperAdmin)
+        {
+            return true;
+        }
+
+        var module = moduleAccessConfig?.Modules.FirstOrDefault(m =>
+            string.Equals(m.ModuleKey, moduleKey, StringComparison.OrdinalIgnoreCase));
+
+        if (module == null)
+        {
+            return true;
+        }
+
+        if (!module.IsEnabled)
+        {
+            return false;
+        }
+
+        return role switch
+        {
+            UserRole.Admin => module.RoleAccess.Admin,
+            UserRole.Supervisor => module.RoleAccess.Supervisor,
+            UserRole.Agent => module.RoleAccess.Agent,
+            UserRole.Customer => module.RoleAccess.Customer,
+            _ => false
+        };
+    }
+
+    private bool IsAllowedBySubscription(string moduleKey)
+    {
+        if (tenantSubscription == null || string.IsNullOrWhiteSpace(tenantSubscription.IncludedModulesCsv))
+        {
+            return true;
+        }
+
+        var rawTokens = tenantSubscription.IncludedModulesCsv
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToList();
+
+        if (rawTokens.Count == 0 || rawTokens.Any(t => t.Equals("All", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        var normalized = rawTokens
+            .Select(NormalizeIncludedModuleToken)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return normalized.Contains(moduleKey);
+    }
+
+    private static string NormalizeIncludedModuleToken(string token)
+    {
+        return token.Trim().ToLowerInvariant() switch
+        {
+            "dashboard" => "dashboard",
+            "users" or "iam" or "modulemanagement" => "iam",
+            "catalog" or "inventory" or "products" => "catalog",
+            "orders" or "returns" => "orders",
+            "tickets" or "support" => "tickets",
+            "calls" => "calls",
+            "customers" or "crm" => "customers",
+            "reports" or "analytics" or "financials" => "reports",
+            "audit" or "security" => "audit-security",
+            "integrations" or "erp" or "settings" => "integrations",
+            "notifications" or "help" => "notifications",
+            _ => token.Trim().ToLowerInvariant()
+        };
+    }
+
+    private static string? GetModuleRouteForRole(string moduleKey, UserRole role)
+    {
+        return role switch
+        {
+            UserRole.Admin => moduleKey switch
+            {
+                "dashboard" => "/dashboard/admin",
+                "catalog" => "/admin/inventory",
+                "orders" => "/admin/orders",
+                "tickets" => "/admin/tickets",
+                "customers" => "/admin/customers",
+                "iam" => "/admin/users",
+                "reports" => "/admin/reports",
+                "notifications" => "/admin/notifications",
+                "integrations" => "/admin/settings",
+                _ => null
+            },
+            UserRole.Supervisor => moduleKey switch
+            {
+                "dashboard" => "/supervisor/dashboard",
+                "catalog" => "/supervisor/inventory/stock",
+                "orders" => "/supervisor/orders",
+                "tickets" => "/supervisor/tickets",
+                "calls" => "/supervisor/calls",
+                "customers" => "/supervisor/customers/search",
+                "reports" => "/supervisor/reports",
+                "notifications" => "/supervisor/notifications",
+                "integrations" => "/supervisor/settings",
+                _ => null
+            },
+            UserRole.Agent => moduleKey switch
+            {
+                "dashboard" => "/agent/dashboard",
+                "orders" => "/agent/orders/history",
+                "tickets" => "/agent/tickets/assigned",
+                "calls" => "/agent/calls/history",
+                "customers" => "/agent/customers",
+                "reports" => "/agent/performance",
+                "notifications" => "/agent/notifications",
+                _ => null
+            },
+            UserRole.Customer => moduleKey switch
+            {
+                "dashboard" => "/customer/dashboard",
+                "catalog" => "/customer/shop",
+                "orders" => "/customer/orders",
+                "tickets" => "/customer/support",
+                "notifications" => "/customer/dashboard",
+                _ => null
+            },
+            _ => null
+        };
+    }
+
+    private string GetRoleDefaultRoute()
+    {
+        var role = AuthService.CurrentUser?.Role;
+        return role switch
+        {
+            UserRole.SuperAdmin => "/superadmin/dashboard",
+            UserRole.Admin => "/dashboard/admin",
+            UserRole.Supervisor => "/supervisor/dashboard",
+            UserRole.Agent => "/agent/dashboard",
+            UserRole.Customer => "/customer/dashboard",
+            _ => "/dashboard"
+        };
+    }
+}

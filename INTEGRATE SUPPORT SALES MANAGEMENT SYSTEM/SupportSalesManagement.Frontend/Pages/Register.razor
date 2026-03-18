@@ -1,0 +1,387 @@
+@page "/register"
+@layout Shared.AuthLayout
+@inject AuthenticationService AuthService
+@inject LocationService LocationService
+@inject NavigationManager NavigationManager
+
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@using Microsoft.AspNetCore.Components.Web
+
+<PageTitle>Register - ClassicFit Apparel Fashion: Sales & Support Workspace</PageTitle>
+
+<div class="min-h-screen relative overflow-hidden font-sans bg-cover bg-center bg-no-repeat"
+     style="background-image: linear-gradient(180deg, rgba(248,252,255,0.35) 0%, rgba(207,223,243,0.20) 55%, rgba(78,116,176,0.18) 100%), url('/images/auth-bg-cityline.png?v=20260309'); background-position: center bottom;">
+    <div class="relative min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl rounded-3xl border border-[#d7e6ef]/85 bg-white/35 backdrop-blur-xl shadow-2xl p-6 text-slate-900">
+            <div class="flex justify-center mb-5">
+                <img src="/images/classicfit-logo-icon.png?v=20260309" alt="ClassicFit Logo" class="h-16 w-16 rounded-2xl object-cover border border-white/30 shadow-lg" />
+            </div>
+            <h2 class="text-center text-3xl font-semibold tracking-wide mb-1">Welcome</h2>
+            <p class="text-center text-slate-700 text-sm mb-5">Create your ClassicFit account</p>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="mb-5 rounded-xl border border-red-200/70 bg-red-500/15 px-4 py-3 text-sm text-red-100">
+                    @errorMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="mb-5 rounded-xl border border-emerald-200/70 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100">
+                    @successMessage
+                </div>
+            }
+
+            <form class="space-y-4" @onsubmit="HandleRegister">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-sm text-slate-700">First Name</label>
+                        <input type="text" required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 placeholder-slate-500 outline-none focus:border-[#5F9EA0] focus:bg-white" placeholder="First Name" @bind="registerRequest.FirstName" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-sm text-slate-700">Last Name</label>
+                        <input type="text" required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 placeholder-slate-500 outline-none focus:border-[#5F9EA0] focus:bg-white" placeholder="Last Name" @bind="registerRequest.LastName" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-sm text-slate-700">Company (Optional)</label>
+                        <input type="text" class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 placeholder-slate-500 outline-none focus:border-[#5F9EA0] focus:bg-white" placeholder="Company Name" @bind="registerRequest.Company" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-sm text-slate-700">Phone Number</label>
+                        <input type="tel" required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 placeholder-slate-500 outline-none focus:border-[#5F9EA0] focus:bg-white" placeholder="+1 (555) 000-0000" @bind="registerRequest.Phone" />
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-sm text-slate-700">Shipping Address</label>
+                    <input type="text" required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 placeholder-slate-500 outline-none focus:border-[#5F9EA0] focus:bg-white" placeholder="Street Address" @bind="registerRequest.Address" />
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-sm text-slate-700">Country</label>
+                    <select required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 outline-none focus:border-[#5F9EA0] focus:bg-white" @onchange="OnCountryChanged">
+                        <option value="" class="text-black">Select Country</option>
+                        @foreach (var country in countries)
+                        {
+                            <option value="@country.Code" class="text-black">@country.Name</option>
+                        }
+                    </select>
+                </div>
+
+                @if (selectedCountryCode == "PH")
+                {
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-sm text-slate-700">Region</label>
+                            <select required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 outline-none focus:border-[#5F9EA0] focus:bg-white" @onchange="OnRegionChanged">
+                                <option value="" class="text-black">Select Region</option>
+                                @foreach (var region in regions)
+                                {
+                                    <option value="@region.Code" class="text-black">@region.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-sm text-slate-700">Province</label>
+                            <select required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 outline-none focus:border-[#5F9EA0] focus:bg-white" @onchange="OnProvinceChanged" disabled="@(provinces.Count == 0)">
+                                <option value="" class="text-black">Select Province</option>
+                                @foreach (var province in provinces)
+                                {
+                                    <option value="@province.Code" class="text-black">@province.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-sm text-slate-700">City / Municipality</label>
+                            <select required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 outline-none focus:border-[#5F9EA0] focus:bg-white" @onchange="OnCityChangedPH" disabled="@(cities.Count == 0)">
+                                <option value="" class="text-black">Select City</option>
+                                @foreach (var city in cities)
+                                {
+                                    <option value="@city.Name" class="text-black">@city.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-sm text-slate-700">Barangay</label>
+                            <select required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 outline-none focus:border-[#5F9EA0] focus:bg-white" @onchange="OnBarangayChanged" disabled="@(barangays.Count == 0)">
+                                <option value="" class="text-black">Select Barangay</option>
+                                @foreach (var brgy in barangays)
+                                {
+                                    <option value="@brgy.Name" class="text-black">@brgy.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-sm text-slate-700">State / Region</label>
+                            <select required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 outline-none focus:border-[#5F9EA0] focus:bg-white" @onchange="OnStateChanged" disabled="@(states.Count == 0 && !string.IsNullOrEmpty(selectedCountryCode))">
+                                <option value="" class="text-black">Select State</option>
+                                @foreach (var state in states)
+                                {
+                                    <option value="@state.Code" class="text-black">@state.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-sm text-slate-700">City</label>
+                            <select required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 outline-none focus:border-[#5F9EA0] focus:bg-white" @onchange="OnCityChangedGeneric" disabled="@(cities.Count == 0 && !string.IsNullOrEmpty(selectedCountryCode))">
+                                <option value="" class="text-black">Select City</option>
+                                @foreach (var city in cities)
+                                {
+                                    <option value="@city.Name" class="text-black">@city.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                }
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-sm text-slate-700">Postal Code</label>
+                        <input type="text" required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 placeholder-slate-500 outline-none focus:border-[#5F9EA0] focus:bg-white" placeholder="ZIP/Postal Code" @bind="registerRequest.PostalCode" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-sm text-slate-700">Email Address</label>
+                        <input type="email" required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 text-slate-900 placeholder-slate-500 outline-none focus:border-[#5F9EA0] focus:bg-white" placeholder="name@example.com" @bind="registerRequest.Email" />
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <div class="flex justify-between items-end">
+                        <label class="text-sm text-slate-700">Password</label>
+                        <span class="text-[10px] text-slate-600">Min. 8 chars, 1 Upper, 1 Lower, 1 Number, 1 Special</span>
+                    </div>
+                    <div class="relative">
+                        <input type="@(showPassword ? "text" : "password")" required class="w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-2.5 pr-11 text-slate-900 placeholder-slate-500 outline-none focus:border-[#5F9EA0] focus:bg-white" placeholder="Create a strong password" @bind="registerRequest.Password" />
+                        <button type="button" @onclick="TogglePasswordVisibility" class="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full text-slate-700 hover:bg-slate-200/70 transition-colors flex items-center justify-center" aria-label="@(showPassword ? "Hide password" : "Show password")">
+                            @if (showPassword)
+                            {
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.58 10.59A2 2 0 0013.41 13.4M9.88 5.09A9.77 9.77 0 0112 4c5 0 9.27 3.11 11 8-1.01 2.86-2.92 4.98-5.35 6.16M6.7 6.72C4.53 8 2.84 9.84 2 12c1.73 4.89 6 8 10 8 1.51 0 2.96-.38 4.27-1.06" />
+                                </svg>
+                            }
+                            else
+                            {
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-8 10-8 10 8 10 8-3.5 8-10 8-10-8-10-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg>
+                            }
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-sm text-slate-700 px-1">
+                    <a href="/login" class="hover:text-slate-900 transition-colors">Already have an account? Login</a>
+                    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=classicfitapparel.fashion%40gmail.com&su=ClassicFit%20Registration%20Support"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="h-10 w-10 rounded-full bg-white border border-slate-300 flex items-center justify-center hover:bg-slate-50"
+                       title="Open Gmail compose">
+                        <svg viewBox="0 0 48 48" class="h-5 w-5" aria-hidden="true">
+                            <path fill="#EA4335" d="M24 9.5c3.2 0 6.1 1.1 8.4 2.8l6.3-6.3C34.8 2.5 29.8 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.3 5.7C11.7 13.3 17.3 9.5 24 9.5z" />
+                            <path fill="#4285F4" d="M46.1 24.5c0-1.7-.2-3.3-.5-4.8H24v9.2h12.4c-.5 3-2.2 5.5-4.7 7.2l7.2 5.6c4.2-3.8 6.6-9.5 6.6-17.2z" />
+                            <path fill="#FBBC05" d="M9.9 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.3-5.7C.9 16.8 0 20.3 0 24s.9 7.2 2.6 10.3l7.3-5.7z" />
+                            <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2 1.4-4.6 2.3-8.7 2.3-6.7 0-12.3-3.8-14.1-9.5l-7.3 5.7C6.6 42.6 14.6 48 24 48z" />
+                        </svg>
+                    </a>
+                </div>
+
+                <label class="flex items-start gap-2 rounded-xl border border-slate-300 bg-white/80 px-3 py-2 text-sm text-slate-700">
+                    <input type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" @bind="registerRequest.AcceptTerms" />
+                    <span>
+                        I agree to the
+                        <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#3b82f6] hover:text-[#1d4ed8]">Terms and Conditions</a>
+                        of ClassicFit Apparel Fashion: Sales &amp; Support Workspace.
+                    </span>
+                </label>
+
+                <button type="submit" disabled="@isLoading" class="w-full rounded-full bg-gradient-to-r from-[#4682B4] to-[#5F9EA0] hover:opacity-95 text-white py-3.5 font-semibold tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    @(isLoading ? "CREATING ACCOUNT..." : "CREATE ACCOUNT")
+                </button>
+
+                <div class="text-center pt-1">
+                    <a href="/" class="text-xs text-slate-600 hover:text-slate-900 transition-colors">Back to Home</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterRequest registerRequest = new();
+    private List<Country> countries = new();
+
+    // Philippines specific lists
+    private List<Region> regions = new();
+    private List<Province> provinces = new();
+    private List<Barangay> barangays = new();
+
+    // Generic lists
+    private List<State> states = new();
+    private List<City> cities = new();
+
+    private string? selectedCountryCode;
+    private string? selectedRegionCode;
+    private string? selectedProvinceCode;
+    private string? selectedStateCode;
+
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private bool isLoading = false;
+    private bool showPassword = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        countries = await LocationService.GetCountriesAsync();
+    }
+
+    private async Task OnCountryChanged(ChangeEventArgs e)
+    {
+        selectedCountryCode = e.Value?.ToString();
+        registerRequest.Country = countries.FirstOrDefault(c => c.Code == selectedCountryCode)?.Name;
+
+        // Reset everything
+        selectedRegionCode = null;
+        selectedProvinceCode = null;
+        selectedStateCode = null;
+        registerRequest.State = null;
+        registerRequest.City = null;
+        registerRequest.PostalCode = null;
+
+        regions = new();
+        provinces = new();
+        states = new();
+        cities = new();
+        barangays = new();
+
+        if (selectedCountryCode == "PH")
+        {
+            regions = await LocationService.GetRegionsAsync(selectedCountryCode);
+        }
+        else if (!string.IsNullOrEmpty(selectedCountryCode))
+        {
+            states = await LocationService.GetStatesAsync(selectedCountryCode);
+        }
+    }
+
+    // Philippines Handlers
+    private async Task OnRegionChanged(ChangeEventArgs e)
+    {
+        selectedRegionCode = e.Value?.ToString();
+
+        selectedProvinceCode = null;
+        registerRequest.State = null;
+        registerRequest.City = null;
+        registerRequest.PostalCode = null;
+
+        provinces = await LocationService.GetProvincesAsync("PH", selectedRegionCode ?? "");
+        cities = new();
+        barangays = new();
+    }
+
+    private async Task OnProvinceChanged(ChangeEventArgs e)
+    {
+        selectedProvinceCode = e.Value?.ToString();
+        registerRequest.State = provinces.FirstOrDefault(p => p.Code == selectedProvinceCode)?.Name;
+
+        registerRequest.City = null;
+        registerRequest.PostalCode = null;
+
+        cities = await LocationService.GetCitiesByProvinceAsync("PH", selectedProvinceCode ?? "");
+        barangays = new();
+    }
+
+    private async Task OnCityChangedPH(ChangeEventArgs e)
+    {
+        registerRequest.City = e.Value?.ToString();
+        registerRequest.PostalCode = null;
+
+        barangays = await LocationService.GetBarangaysAsync("PH", registerRequest.City ?? "");
+    }
+
+    private void OnBarangayChanged(ChangeEventArgs e)
+    {
+        var brgyName = e.Value?.ToString();
+        var brgy = barangays.FirstOrDefault(b => b.Name == brgyName);
+        registerRequest.PostalCode = brgy?.PostalCode;
+
+        // Optionally append barangay to address or city?
+        // User said "Selecting a city automatically lists barangays... auto-display postal code once barangay is chosen"
+        // I'll keep the city as is and just set the postal code.
+    }
+
+    // Generic Handlers
+    private async Task OnStateChanged(ChangeEventArgs e)
+    {
+        selectedStateCode = e.Value?.ToString();
+        registerRequest.State = states.FirstOrDefault(s => s.Code == selectedStateCode)?.Name;
+
+        registerRequest.City = null;
+        registerRequest.PostalCode = null;
+
+        cities = await LocationService.GetCitiesAsync(selectedCountryCode ?? "", selectedStateCode ?? "");
+    }
+
+    private void OnCityChangedGeneric(ChangeEventArgs e)
+    {
+        registerRequest.City = e.Value?.ToString();
+        var city = cities.FirstOrDefault(c => c.Name == registerRequest.City);
+        registerRequest.PostalCode = city?.PostalCode;
+    }
+
+    private async Task HandleRegister()
+    {
+        if (!registerRequest.AcceptTerms)
+        {
+            errorMessage = "You must accept the Terms and Conditions before creating an account.";
+            successMessage = string.Empty;
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var (success, message) = await AuthService.RegisterAsync(registerRequest);
+            if (success)
+            {
+                successMessage = "Registration successful! Please login with your credentials.";
+                // Redirect to login after a short delay
+                await Task.Delay(2000);
+                NavigationManager.NavigateTo("/login");
+            }
+            else
+            {
+                errorMessage = !string.IsNullOrEmpty(message) ? message : "Registration failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        showPassword = !showPassword;
+    }
+}

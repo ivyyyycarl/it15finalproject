@@ -1,0 +1,339 @@
+@page "/superadmin/module-management"
+@using SupportSalesManagement.Frontend.Models
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject ApiClient ApiClient
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Module Management - Super Admin</PageTitle>
+
+<div class="space-y-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm ui-surface-card">
+        <h1 class="text-2xl font-bold text-gray-900">Module Management</h1>
+        <p class="text-sm text-gray-600 mt-1">
+            Manage system modules, control role access, and enforce Super Admin-only governance.
+        </p>
+        @if (config != null && config.Modules.Any())
+        {
+            <div class="mt-5 flex flex-wrap gap-6 text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span class="text-gray-700"><span class="font-bold">@ActiveCount</span> Active</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
+                    <span class="text-gray-700"><span class="font-bold">@DisabledCount</span> Disabled</span>
+                </div>
+                <div class="text-gray-700">
+                    Total: <span class="font-bold">@config.Modules.Count</span> system modules
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">@errorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 text-sm">@successMessage</div>
+    }
+
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden ui-surface-card">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900">System Modules</h2>
+                <p class="text-xs text-gray-500">Module names are aligned to your current system features.</p>
+            </div>
+            <button @onclick="SaveConfiguration"
+                    disabled="@isLoading || isSaving || config == null"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 text-sm font-semibold">
+                @(isSaving ? "Saving..." : "Save Changes")
+            </button>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="p-6 text-sm text-gray-500">Loading module configuration...</div>
+        }
+        else if (config == null || !config.Modules.Any())
+        {
+            <div class="p-6 text-sm text-gray-500">No module configuration found.</div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-50 border-b border-gray-100">
+                        <tr class="text-left text-gray-600">
+                            <th class="px-4 py-3 font-semibold">Module Name</th>
+                            <th class="px-4 py-3 font-semibold">Description</th>
+                            <th class="px-4 py-3 font-semibold">Category</th>
+                            <th class="px-4 py-3 font-semibold">Target Role</th>
+                            <th class="px-4 py-3 font-semibold text-center">Status</th>
+                            <th class="px-4 py-3 font-semibold text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var module in config.Modules)
+                        {
+                            <tr class="border-b border-gray-100">
+                                <td class="px-4 py-4 align-top">
+                                    <div class="font-semibold text-gray-900">@module.DisplayName</div>
+                                    <div class="text-xs text-gray-400 mt-1">@module.ModuleKey</div>
+                                </td>
+                                <td class="px-4 py-4 align-top text-gray-600 max-w-sm">@module.Description</td>
+                                <td class="px-4 py-4 align-top">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold @GetCategoryBadgeClass(module.Category)">
+                                        @module.Category
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4 align-top">
+                                    <div class="flex flex-wrap gap-1.5">
+                                        @foreach (var role in GetTargetRoles(module))
+                                        {
+                                            <span class="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">@role</span>
+                                        }
+                                    </div>
+                                </td>
+                                <td class="px-4 py-4 align-top text-center">
+                                    @if (module.IsEnabled)
+                                    {
+                                        <span class="inline-flex px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="inline-flex px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold">Disabled</span>
+                                    }
+                                </td>
+                                <td class="px-4 py-4 align-top">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <button type="button"
+                                                @onclick="() => ToggleModuleStatus(module)"
+                                                class="text-xs font-semibold px-3 py-1.5 rounded-md border transition-colors @(module.IsEnabled ? "border-red-200 text-red-700 hover:bg-red-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50")">
+                                            @(module.IsEnabled ? "Disable" : "Enable")
+                                        </button>
+                                        <button type="button"
+                                                @onclick="() => ToggleExpandedModule(module.ModuleKey)"
+                                                class="text-xs font-semibold px-3 py-1.5 rounded-md border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors">
+                                            @(expandedModuleKey == module.ModuleKey ? "Hide Roles" : "Role Access")
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            @if (expandedModuleKey == module.ModuleKey)
+                            {
+                                <tr class="bg-gray-50/70 border-b border-gray-100">
+                                    <td colspan="6" class="px-4 py-4">
+                                        <div class="text-xs font-bold text-gray-700 mb-3 uppercase tracking-wide">Configure Actor Access</div>
+                                        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <input type="checkbox" checked disabled class="h-4 w-4 cursor-not-allowed" />
+                                                <span>Super Admin (Always On)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <input type="checkbox" @bind="module.RoleAccess.Admin" disabled="@(!module.IsEnabled)" class="h-4 w-4" />
+                                                <span>Admin</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <input type="checkbox" @bind="module.RoleAccess.Supervisor" disabled="@(!module.IsEnabled)" class="h-4 w-4" />
+                                                <span>Supervisor</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <input type="checkbox" @bind="module.RoleAccess.Agent" disabled="@(!module.IsEnabled)" class="h-4 w-4" />
+                                                <span>Agent</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <input type="checkbox" @bind="module.RoleAccess.Customer" disabled="@(!module.IsEnabled)" class="h-4 w-4" />
+                                                <span>Customer</span>
+                                            </label>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private ModuleAccessConfig? config;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? expandedModuleKey;
+    private int ActiveCount => config?.Modules.Count(m => m.IsEnabled) ?? 0;
+    private int DisabledCount => config?.Modules.Count(m => !m.IsEnabled) ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConfiguration();
+    }
+
+    private async Task LoadConfiguration()
+    {
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await ApiClient.GetModuleAccessConfigWithDetailsAsync();
+            config = result.Config;
+            if (config == null)
+            {
+                errorMessage = $"Unable to load module configuration. {result.Error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load configuration: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveConfiguration()
+    {
+        if (config == null)
+        {
+            return;
+        }
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            "Save module access configuration changes now?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var updated = await ApiClient.UpdateModuleAccessConfigAsync(config);
+            if (updated == null)
+            {
+                errorMessage = "Save failed. Please try again.";
+                return;
+            }
+
+            config = updated;
+            successMessage = "Module access configuration saved successfully.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Save failed: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ToggleModuleStatus(ModuleAccessItem module)
+    {
+        if (config == null)
+        {
+            return;
+        }
+
+        var targetState = module.IsEnabled ? "disable" : "enable";
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Are you sure you want to {targetState} '{module.DisplayName}'?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var previousEnabled = module.IsEnabled;
+        var previousAdmin = module.RoleAccess.Admin;
+        var previousSupervisor = module.RoleAccess.Supervisor;
+        var previousAgent = module.RoleAccess.Agent;
+        var previousCustomer = module.RoleAccess.Customer;
+
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        module.IsEnabled = !module.IsEnabled;
+        if (!module.IsEnabled)
+        {
+            module.RoleAccess.Admin = false;
+            module.RoleAccess.Supervisor = false;
+            module.RoleAccess.Agent = false;
+            module.RoleAccess.Customer = false;
+        }
+
+        try
+        {
+            var updated = await ApiClient.UpdateModuleAccessConfigAsync(config);
+            if (updated == null)
+            {
+                module.IsEnabled = previousEnabled;
+                module.RoleAccess.Admin = previousAdmin;
+                module.RoleAccess.Supervisor = previousSupervisor;
+                module.RoleAccess.Agent = previousAgent;
+                module.RoleAccess.Customer = previousCustomer;
+                errorMessage = "Unable to update module status right now.";
+                return;
+            }
+
+            config = updated;
+            successMessage = $"'{module.DisplayName}' is now {(module.IsEnabled ? "enabled" : "disabled")}.";
+        }
+        catch (Exception ex)
+        {
+            module.IsEnabled = previousEnabled;
+            module.RoleAccess.Admin = previousAdmin;
+            module.RoleAccess.Supervisor = previousSupervisor;
+            module.RoleAccess.Agent = previousAgent;
+            module.RoleAccess.Customer = previousCustomer;
+            errorMessage = $"Failed to update module status: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ToggleExpandedModule(string moduleKey)
+    {
+        expandedModuleKey = expandedModuleKey == moduleKey ? null : moduleKey;
+    }
+
+    private IEnumerable<string> GetTargetRoles(ModuleAccessItem module)
+    {
+        var roles = new List<string> { "Super Admin" };
+        if (module.RoleAccess.Admin) roles.Add("Admin");
+        if (module.RoleAccess.Supervisor) roles.Add("Supervisor");
+        if (module.RoleAccess.Agent) roles.Add("Agent");
+        if (module.RoleAccess.Customer) roles.Add("Customer");
+        return roles;
+    }
+
+    private string GetCategoryBadgeClass(string category)
+    {
+        return category.ToLowerInvariant() switch
+        {
+            "core" => "bg-indigo-50 text-indigo-700",
+            "security" => "bg-red-50 text-red-700",
+            "inventory" => "bg-emerald-50 text-emerald-700",
+            "operations" => "bg-blue-50 text-blue-700",
+            "service" => "bg-cyan-50 text-cyan-700",
+            "crm" => "bg-violet-50 text-violet-700",
+            "analytics" => "bg-amber-50 text-amber-700",
+            "infrastructure" => "bg-slate-100 text-slate-700",
+            "communication" => "bg-pink-50 text-pink-700",
+            _ => "bg-gray-100 text-gray-700"
+        };
+    }
+}

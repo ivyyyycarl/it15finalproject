@@ -1,0 +1,23 @@
+@page "/superadmin/help/contact"
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+
+<PageTitle>Contact Support - Super Admin</PageTitle>
+
+<div class="p-8">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Contact Support</h1>
+    <div class="bg-white p-6 rounded-lg shadow">
+        <div class="space-y-6">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Technical Support</h3>
+                <p class="text-gray-600">Email: support@classicfit.com</p>
+                <p class="text-gray-600 text-sm mt-1">For system issues, bug reports, and feature requests.</p>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Emergency Support</h3>
+                <p class="text-gray-600">For critical system outages, contact your system administrator directly.</p>
+                <p class="text-gray-600 text-sm mt-1">Available 24/7 for critical production issues.</p>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,197 @@
+@page "/supervisor/tickets/create"
+@layout SupervisorLayout
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+@using SupportSalesManagement.Frontend.Models
+@using CustomerModel = SupportSalesManagement.Frontend.Models.Customer
+@using SupportSalesManagement.Frontend.Services
+
+<PageTitle>Create New Ticket | Supervisor</PageTitle>
+
+<div class="max-w-3xl mx-auto px-6 py-6" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="mb-6 flex items-center gap-4">
+        <button @onclick='() => NavigationManager.NavigateTo("/supervisor/tickets")'
+            class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+        </button>
+        <div>
+            <h1 class="text-[22px] font-bold text-[#1E1E2D] dark:text-white">Create New Support Ticket</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Fill in the details below to open a new case.</p>
+        </div>
+    </div>
+
+    <div
+        class="bg-white dark:bg-[#1E1E2D] rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 md:p-8">
+        @if (isLoading)
+        {
+            <div class="flex justify-center py-12">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]"></div>
+            </div>
+        }
+        else
+        {
+            <form @onsubmit="SaveTicket" class="space-y-6">
+                <!-- Customer Selection -->
+                <div>
+                    <label class="block text-sm font-semibold text-[#1E1E2D] dark:text-gray-200 mb-2">Select
+                        Customer</label>
+                    <div class="relative">
+                        <select @bind="ticketForm.CustomerId" required
+                            class="block w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] transition-all text-gray-900 hover:bg-gray-50">
+                            <option value="">-- Choose a Customer --</option>
+                            @if (customers != null)
+                            {
+                                @foreach (var customer in customers)
+                                {
+                                    <option value="@customer.Id">@customer.FirstName @customer.LastName (@customer.Email)</option>
+                                }
+                            }
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ticket Details -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-[#1E1E2D] dark:text-gray-200 mb-2">Priority</label>
+                        <div class="relative">
+                            <select @bind="ticketForm.Priority" required
+                                class="block w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] transition-all text-gray-900 hover:bg-gray-50">
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                            </select>
+                            <div
+                                class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-[#1E1E2D] dark:text-gray-200 mb-2">Category</label>
+                        <div class="relative">
+                            <select @bind="ticketForm.Category" required
+                                class="block w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] transition-all text-gray-900 hover:bg-gray-50">
+                                <option value="General">General</option>
+                                <option value="Technical">Technical</option>
+                                <option value="Billing">Billing</option>
+                                <option value="Sales">Sales</option>
+                            </select>
+                            <div
+                                class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-[#1E1E2D] dark:text-gray-200 mb-2">Subject /
+                        Title</label>
+                    <input type="text" @bind="ticketForm.Title" required placeholder="Brief summary of the issue..."
+                        class="block w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] transition-all text-gray-900 placeholder-gray-400 hover:bg-gray-50" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-[#1E1E2D] dark:text-gray-200 mb-2">Description</label>
+                    <textarea @bind="ticketForm.Description" rows="6" required
+                        placeholder="Detailed explanation of the problem..."
+                        class="block w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] transition-all text-gray-900 placeholder-gray-400 resize-none hover:bg-gray-50"></textarea>
+                </div>
+
+                <!-- Actions -->
+                <div class="pt-4 flex items-center justify-end gap-3 border-t border-gray-100 dark:border-gray-700">
+                    <button type="button" @onclick='() => NavigationManager.NavigateTo("/supervisor/tickets")'
+                        class="px-6 py-2.5 rounded-xl font-bold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" disabled="@isSaving"
+                        class="px-6 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2">
+                        @if (isSaving)
+                        {
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                                </circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            <span>Submitting...</span>
+                        }
+                        else
+                        {
+                            <span>Create Ticket</span>
+                        }
+                    </button>
+                </div>
+            </form>
+        }
+    </div>
+</div>
+
+@code {
+    private CreateTicketRequest ticketForm = new();
+    private List<CustomerModel> customers = new();
+    private bool isLoading = true;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        try
+        {
+            customers = (await ApiClient.GetCustomersAsync()) ?? new List<CustomerModel>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading customers: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveTicket()
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Confirm create this support ticket?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            await ApiClient.CreateTicketAsync(ticketForm);
+            NavigationManager.NavigateTo("/supervisor/tickets");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving ticket: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

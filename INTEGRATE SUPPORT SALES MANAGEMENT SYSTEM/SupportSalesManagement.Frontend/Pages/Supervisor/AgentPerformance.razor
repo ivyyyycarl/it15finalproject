@@ -1,0 +1,187 @@
+@page "/supervisor/agents/performance"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor,Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+
+<div class="p-6 space-y-4" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-[22px] font-bold text-gray-900">Agent Performance Reports</h1>
+            <p class="text-gray-600 mt-1">Track and analyze individual agent metrics and team performance</p>
+        </div>
+        <button @onclick="LoadAgents"
+            class="px-4 py-2 bg-[#1E3A5F] text-white rounded-lg hover:bg-[#2C5282] transition-colors shadow-md flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex justify-center py-12">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        </div>
+    }
+    else
+    {
+        <!-- Performance Overview Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-medium text-gray-600">Total Agents</h3>
+                    <svg class="w-5 h-5 text-[#80A1BA]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </div>
+                <p class="text-2xl font-bold text-[#1E3A5F]">@agents.Count</p>
+                <p class="text-xs text-gray-500 mt-1">Active agents</p>
+            </div>
+
+            <div class="bg-gradient-to-br from-blue-50 to-white rounded-xl shadow-sm border border-blue-100 p-5">
+                <h3 class="text-sm font-medium text-gray-600 mb-3">Total Orders Managed</h3>
+                <p class="text-2xl font-bold text-[#1E3A5F]">@totalOrders</p>
+                <p class="text-xs text-gray-500 mt-1">All time</p>
+            </div>
+
+            <div class="bg-gradient-to-br from-emerald-50 to-white rounded-xl shadow-sm border border-emerald-100 p-5">
+                <h3 class="text-sm font-medium text-gray-600 mb-3">Total Tickets</h3>
+                <p class="text-2xl font-bold text-[#1E3A5F]">@totalTickets</p>
+                <p class="text-xs text-gray-500 mt-1">All time</p>
+            </div>
+
+            <div class="bg-gradient-to-br from-violet-50 to-white rounded-xl shadow-sm border border-violet-100 p-5">
+                <h3 class="text-sm font-medium text-gray-600 mb-3">Total Revenue</h3>
+                <p class="text-2xl font-bold text-[#1E3A5F]">@($"₱{totalRevenue:N2}")</p>
+                <p class="text-xs text-gray-500 mt-1">All time</p>
+            </div>
+        </div>
+
+        <!-- Agent Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-xl font-bold text-[#1E3A5F]">Agent Directory</h2>
+            </div>
+            <div class="overflow-x-auto">
+                @if (!agents.Any())
+                {
+                    <div class="p-12 text-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900">No agents found</h3>
+                        <p class="mt-1 text-sm text-gray-500">No agent accounts have been created yet.</p>
+                    </div>
+                }
+                else
+                {
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Agent</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Role</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @foreach (var agent in agents)
+                            {
+                                var initials = GetInitials(agent);
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 bg-gradient-to-br from-[#1E3A5F] to-[#91C4C3] rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                                @initials
+                                            </div>
+                                            <div class="ml-3">
+                                                <p class="text-sm font-semibold text-gray-900">@agent.Name</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@agent.Email</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                            @agent.Role
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<User> agents = new();
+    private bool isLoading = true;
+    private int totalOrders = 0;
+    private int totalTickets = 0;
+    private decimal totalRevenue = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAgents();
+    }
+
+    private async Task LoadAgents()
+    {
+        isLoading = true;
+        try
+        {
+            // Load users and filter to agents
+            var users = await ApiClient.GetUsersAsync();
+            if (users != null)
+            {
+                agents = users.Where(u => u.Role == UserRole.Agent).ToList();
+            }
+
+            // Load orders for stats
+            var orders = await ApiClient.GetOrdersAsync();
+            if (orders != null)
+            {
+                totalOrders = orders.Count;
+                totalRevenue = orders.Sum(o => o.TotalAmount);
+            }
+
+            // Load tickets for stats
+            try
+            {
+                var tickets = await ApiClient.GetTicketsAsync();
+                if (tickets != null)
+                {
+                    totalTickets = tickets.Count;
+                }
+            }
+            catch { totalTickets = 0; }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading agents: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetInitials(User user)
+    {
+        var first = !string.IsNullOrEmpty(user.FirstName) ? user.FirstName[0].ToString().ToUpper() : "";
+        var last = !string.IsNullOrEmpty(user.LastName) ? user.LastName[0].ToString().ToUpper() : "";
+        var result = $"{first}{last}";
+        return string.IsNullOrEmpty(result) ? user.Email[0].ToString().ToUpper() : result;
+    }
+}

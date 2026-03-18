@@ -1,0 +1,147 @@
+@page "/superadmin/integrations"
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject SupportSalesManagement.Frontend.Services.ApiClient ApiClient
+@using SupportSalesManagement.Frontend.Models
+
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">ERP Integration Status</h1>
+            <p class="text-sm text-gray-500">Monitor API connections and system health.</p>
+        </div>
+        <button @onclick="CheckConnections" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium @(isChecking ? "animate-pulse" : "")">
+            @(isChecking ? "Checking..." : "Refresh Status")
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-medium text-gray-500">Inventory API</h3>
+                @if (inventoryApiOk)
+                {
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Online</span>
+                }
+                else
+                {
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Error</span>
+                }
+            </div>
+            <p class="text-2xl font-bold text-gray-900">@inventoryItemCount items</p>
+            <p class="text-sm text-gray-500 mt-1">Products in ERP inventory</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-medium text-gray-500">Finance API</h3>
+                @if (financeApiOk)
+                {
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Online</span>
+                }
+                else
+                {
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Error</span>
+                }
+            </div>
+            <p class="text-2xl font-bold text-gray-900">@transactionCount transactions</p>
+            <p class="text-sm text-gray-500 mt-1">Financial records loaded</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-medium text-gray-500">Database</h3>
+                @if (dbOk)
+                {
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Online</span>
+                }
+                else
+                {
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Error</span>
+                }
+            </div>
+            <p class="text-2xl font-bold text-gray-900">@productCount products</p>
+            <p class="text-sm text-gray-500 mt-1">In main database</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">Connection Log</h2>
+        <div class="space-y-3">
+            @foreach (var logEntry in connectionLog)
+            {
+                <div class="flex items-start gap-3 text-sm">
+                    <span class="text-gray-400 w-20 flex-shrink-0">@logEntry.Time.ToString("HH:mm:ss")</span>
+                    <span class="@(logEntry.IsSuccess ? "text-green-700" : "text-red-700") font-medium">@logEntry.Message</span>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isChecking = false;
+    private bool inventoryApiOk = false;
+    private bool financeApiOk = false;
+    private bool dbOk = false;
+    private int inventoryItemCount = 0;
+    private int transactionCount = 0;
+    private int productCount = 0;
+    private List<LogEntry> connectionLog = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckConnections();
+    }
+
+    private async Task CheckConnections()
+    {
+        isChecking = true;
+        connectionLog.Clear();
+        StateHasChanged();
+
+        try
+        {
+            var inventory = await ApiClient.GetErpInventoryAsync();
+            inventoryApiOk = inventory != null;
+            inventoryItemCount = inventory?.Count ?? 0;
+            connectionLog.Add(new LogEntry(DateTime.Now, inventoryApiOk, $"Inventory API: {(inventoryApiOk ? $"OK - {inventoryItemCount} items loaded" : "Failed")}"));
+        }
+        catch
+        {
+            inventoryApiOk = false;
+            connectionLog.Add(new LogEntry(DateTime.Now, false, "Inventory API: Connection failed"));
+        }
+
+        try
+        {
+            var transactions = await ApiClient.GetErpTransactionsAsync();
+            financeApiOk = transactions != null;
+            transactionCount = transactions?.Count ?? 0;
+            connectionLog.Add(new LogEntry(DateTime.Now, financeApiOk, $"Finance API: {(financeApiOk ? $"OK - {transactionCount} transactions loaded" : "Failed")}"));
+        }
+        catch
+        {
+            financeApiOk = false;
+            connectionLog.Add(new LogEntry(DateTime.Now, false, "Finance API: Connection failed"));
+        }
+
+        try
+        {
+            var products = await ApiClient.GetProductsAsync();
+            dbOk = products != null;
+            productCount = products?.Count ?? 0;
+            connectionLog.Add(new LogEntry(DateTime.Now, dbOk, $"Database: {(dbOk ? $"OK - {productCount} products in DB" : "Failed")}"));
+        }
+        catch
+        {
+            dbOk = false;
+            connectionLog.Add(new LogEntry(DateTime.Now, false, "Database: Connection failed"));
+        }
+
+        isChecking = false;
+        StateHasChanged();
+    }
+
+    private record LogEntry(DateTime Time, bool IsSuccess, string Message);
+}

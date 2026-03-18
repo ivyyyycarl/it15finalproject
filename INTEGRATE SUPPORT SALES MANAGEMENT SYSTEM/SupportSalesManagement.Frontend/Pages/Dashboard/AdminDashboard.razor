@@ -1,0 +1,1192 @@
+@page "/dashboard/admin"
+@page "/admin"
+@page "/admin/dashboard"
+@layout AdminLayout
+@using SupportSalesManagement.Frontend.Services
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Pages.Dashboard.Components
+@using Microsoft.AspNetCore.Authorization
+@using System.Globalization
+@attribute [Authorize(Roles = "Admin")]
+@inject IInventoryService InventoryService
+@inject IFinanceService FinanceService
+@inject IDashboardService DashboardService
+@inject ApiClient _apiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Admin Command Center - ClassicFit</PageTitle>
+
+@if (loadError != null)
+
+{
+        <div class="mx-6 mt-6 p-5 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-4">
+            <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-sm font-bold text-red-900">Dashboard Error</h3>
+                <p class="text-sm text-red-700 mt-0.5">@loadError</p>
+            </div>
+            <button @onclick="() => loadError = null" class="text-red-400 hover:text-red-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+}
+
+<div class="dash-container">
+
+    <!-- ============================================================ -->
+    <!-- HEADER                                                        -->
+    <!-- ============================================================ -->
+    <div class="dash-header">
+        <div class="dash-header-left">
+            <div class="dash-header-title-row">
+                <h1 class="dash-title">Admin Command Center</h1>
+                <span class="dash-role-badge">Admin</span>
+            </div>
+            <p class="dash-subtitle">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                @DateTime.Now.ToString("dddd, MMMM d, yyyy")
+                <span class="dash-subtitle-sep">|</span>
+                Daily oversight of sales, inventory, support, and team performance
+            </p>
+        </div>
+        <div class="dash-header-actions">
+            <button @onclick="RefreshData" class="dash-btn-secondary" disabled="@isLoading">
+                <svg class="w-4 h-4 @(isLoading ? "animate-spin" : "")" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Refresh</span>
+            </button>
+            @if (canViewAdminAnalytics)
+            {
+                <a href="/admin/reports" class="dash-btn-primary">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Reports</span>
+                </a>
+            }
+        </div>
+    </div>
+
+    <!-- ===== STAT CARDS ===== -->
+    <div class="sc-grid">
+        <a href="/admin/reports/sales" class="sc-card sc-card-link">
+            <div class="sc-top">
+                <div><p class="sc-label">Total Revenue</p><p class="sc-val">&#8369;@allTimeRevenue.ToString("N0")</p>
+                    <span class="sc-chg @(revenueMonthChangePercent >= 0 ? "sc-up" : "sc-dn")">
+                        <svg viewBox="0 0 10 10" width="10">
+                            <path d="@(revenueMonthChangePercent >= 0 ? "M1 8L5 2L9 8" : "M1 2L5 8L9 2")" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+                        </svg>
+                        @Math.Abs(revenueMonthChangePercent).ToString("N1")% vs last month
+                    </span>
+                </div>
+                <div class="sc-icon sc-icon-g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+            </div>
+            <svg class="sc-spark" viewBox="0 0 200 44" preserveAspectRatio="none"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#10b981" stop-opacity=".35"/><stop offset="100%" stop-color="#10b981" stop-opacity="0"/></linearGradient></defs><path d="M0 34C30 30 50 26 80 20C110 14 140 16 170 8C185 4 195 3 200 2" fill="none" stroke="#10b981" stroke-width="2"/><path d="M0 34C30 30 50 26 80 20C110 14 140 16 170 8C185 4 195 3 200 2L200 44L0 44Z" fill="url(#g1)"/></svg>
+        </a>
+        <a href="/admin/orders" class="sc-card sc-card-link">
+            <div class="sc-top">
+                <div>
+                    <p class="sc-label">Total Orders</p>
+                    <p class="sc-val">@totalOrders</p>
+                    <span class="sc-chg @(ordersMonthChangePercent >= 0 ? "sc-up" : "sc-dn")">
+                        <svg viewBox="0 0 10 10" width="10">
+                            <path d="@(ordersMonthChangePercent >= 0 ? "M1 8L5 2L9 8" : "M1 2L5 8L9 2")" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+                        </svg>
+                        @Math.Abs(ordersMonthChangePercent).ToString("N1")% vs last month
+                    </span>
+                    <div class="sc-subchips">
+                        <a href="/admin/orders?focus=refunds#refund-requests" class="sc-chip sc-chip-rose">Refund Requests: @pendingRefundRequests.Count</a>
+                    </div>
+                </div>
+                <div class="sc-icon sc-icon-b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg></div>
+            </div>
+            <svg class="sc-spark" viewBox="0 0 200 44" preserveAspectRatio="none"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3b82f6" stop-opacity=".35"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></linearGradient></defs><path d="M0 36C30 32 60 28 90 22C120 16 140 20 170 12C185 8 195 5 200 4" fill="none" stroke="#3b82f6" stroke-width="2"/><path d="M0 36C30 32 60 28 90 22C120 16 140 20 170 12C185 8 195 5 200 4L200 44L0 44Z" fill="url(#g2)"/></svg>
+        </a>
+        <a href="/admin/escalations" class="sc-card sc-card-link">
+            <div class="sc-top">
+                <div><p class="sc-label">Support Tickets</p><p class="sc-val">@totalTickets</p>
+                    @if (escalatedTickets > 0){<span class="sc-chg sc-dn"><svg viewBox="0 0 10 10" width="10"><path d="M1 2L5 8L9 2" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>@escalatedTickets escalated</span>}
+                    else{<span class="sc-chg sc-up"><svg viewBox="0 0 10 10" width="10"><path d="M1 8L5 2L9 8" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>All on track</span>}
+                </div>
+                <div class="sc-icon sc-icon-v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg></div>
+            </div>
+            <svg class="sc-spark" viewBox="0 0 200 44" preserveAspectRatio="none"><defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8b5cf6" stop-opacity=".35"/><stop offset="100%" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs><path d="M0 30C30 26 50 30 80 22C110 14 130 18 160 10C175 6 190 4 200 3" fill="none" stroke="#8b5cf6" stroke-width="2"/><path d="M0 30C30 26 50 30 80 22C110 14 130 18 160 10C175 6 190 4 200 3L200 44L0 44Z" fill="url(#g3)"/></svg>
+        </a>
+        <a href="/admin/inventory" class="sc-card sc-card-link">
+            <div class="sc-top">
+                <div><p class="sc-label">Inventory Items</p><p class="sc-val">@totalProducts</p>
+                    @if(lowStockCount > 0){<span class="sc-chg sc-dn"><svg viewBox="0 0 10 10" width="10"><path d="M1 2L5 8L9 2" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>@lowStockCount low stock</span>}
+                    else{<span class="sc-chg sc-up"><svg viewBox="0 0 10 10" width="10"><path d="M1 8L5 2L9 8" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>Well stocked</span>}
+                </div>
+                <div class="sc-icon sc-icon-a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div>
+            </div>
+            <svg class="sc-spark" viewBox="0 0 200 44" preserveAspectRatio="none"><defs><linearGradient id="g4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f59e0b" stop-opacity=".35"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/></linearGradient></defs><path d="M0 38C30 36 50 32 80 26C100 22 120 24 150 16C170 10 185 6 200 4" fill="none" stroke="#f59e0b" stroke-width="2"/><path d="M0 38C30 36 50 32 80 26C100 22 120 24 150 16C170 10 185 6 200 4L200 44L0 44Z" fill="url(#g4)"/></svg>
+        </a>
+    </div>
+
+    <!-- ===== ANALYTICS ROW ===== -->
+    @if (canViewAdminAnalytics)
+    {
+    <div class="an-row">
+        <!-- Overview Area Chart -->
+        <div class="an-chart-card">
+            <div class="an-chart-head">
+                <div><h3 class="an-chart-title">Revenue Overview</h3><p class="an-chart-sub">Monthly performance · current year</p></div>
+                <div class="an-tabs">
+                    <button class="an-tab @(selectedChartMetric == "revenue" ? "an-tab-on" : string.Empty)" type="button" @onclick='() => SetChartMetric("revenue")'>Revenue</button>
+                    <button class="an-tab @(selectedChartMetric == "orders" ? "an-tab-on" : string.Empty)" type="button" @onclick='() => SetChartMetric("orders")'>Orders</button>
+                    <button class="an-tab @(selectedChartMetric == "profit" ? "an-tab-on" : string.Empty)" type="button" @onclick='() => SetChartMetric("profit")'>Profit</button>
+                </div>
+            </div>
+            <div class="an-chart-body">
+                <div class="an-ylabels">
+                    <span>@FormatChartAxisValue(chartSeriesMax)</span>
+                    <span>@FormatChartAxisValue(chartSeriesMax * 0.75m)</span>
+                    <span>@FormatChartAxisValue(chartSeriesMax * 0.50m)</span>
+                    <span>@FormatChartAxisValue(chartSeriesMax * 0.25m)</span>
+                    <span>@FormatChartAxisValue(0)</span>
+                </div>
+                <div class="an-chartarea">
+                    <svg viewBox="0 0 600 180" preserveAspectRatio="none" style="width:100%;height:180px;display:block">
+                        <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="@chartSeriesColor" stop-opacity=".4"/><stop offset="100%" stop-color="@chartSeriesColor" stop-opacity=".03"/></linearGradient></defs>
+                        <line x1="0" y1="0" x2="600" y2="0" stroke="#f1f5f9" stroke-width="1"/>
+                        <line x1="0" y1="45" x2="600" y2="45" stroke="#f1f5f9" stroke-width="1"/>
+                        <line x1="0" y1="90" x2="600" y2="90" stroke="#f1f5f9" stroke-width="1"/>
+                        <line x1="0" y1="135" x2="600" y2="135" stroke="#f1f5f9" stroke-width="1"/>
+                        <path d="@chartAreaPath" fill="url(#ag)"/>
+                        <path d="@chartLinePath" fill="none" stroke="@chartSeriesColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <div class="an-xlabels"><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span></div>
+                </div>
+            </div>
+        </div>
+        <!-- Right side panels -->
+        <div class="an-right">
+            <!-- Order Status Donut -->
+            <div class="side-box">
+                <h4 class="side-box-title">Order Status</h4>
+                <p class="side-box-sub">Current distribution</p>
+                <div class="donut-row">
+                    <svg viewBox="0 0 100 100" style="width:90px;height:90px;flex-shrink:0">
+                        <circle cx="50" cy="50" r="38" fill="none" stroke="#f1f5f9" stroke-width="14"/>
+                        <circle cx="50" cy="50" r="38" fill="none" stroke="#f59e0b" stroke-width="14" stroke-dasharray="@(SafePercent(pendingOrders,totalOrders) != "0" ? (double.Parse(SafePercent(pendingOrders,totalOrders)) * 2.39).ToString("F1") : "0") 239" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
+                        <circle cx="50" cy="50" r="38" fill="none" stroke="#3b82f6" stroke-width="14" stroke-dasharray="@(SafePercent(processingOrders,totalOrders) != "0" ? (double.Parse(SafePercent(processingOrders,totalOrders)) * 2.39).ToString("F1") : "0") 239" stroke-dashoffset="-@((double.Parse(SafePercent(pendingOrders,Math.Max(1,totalOrders))) * 2.39).ToString("F1"))" transform="rotate(-90 50 50)"/>
+                        <circle cx="50" cy="50" r="38" fill="none" stroke="#10b981" stroke-width="14" stroke-dasharray="@(SafePercent(shippedOrders,totalOrders) != "0" ? (double.Parse(SafePercent(shippedOrders,totalOrders)) * 2.39).ToString("F1") : "0") 239" stroke-dashoffset="-@(((double.Parse(SafePercent(pendingOrders,Math.Max(1,totalOrders))) + double.Parse(SafePercent(processingOrders,Math.Max(1,totalOrders)))) * 2.39).ToString("F1"))" transform="rotate(-90 50 50)"/>
+                        <circle cx="50" cy="50" r="38" fill="none" stroke="#ef4444" stroke-width="14" stroke-dasharray="@(SafePercent(cancelledOrders,totalOrders) != "0" ? (double.Parse(SafePercent(cancelledOrders,totalOrders)) * 2.39).ToString("F1") : "0") 239" stroke-dashoffset="-@(((double.Parse(SafePercent(pendingOrders,Math.Max(1,totalOrders))) + double.Parse(SafePercent(processingOrders,Math.Max(1,totalOrders))) + double.Parse(SafePercent(shippedOrders,Math.Max(1,totalOrders)))) * 2.39).ToString("F1"))" transform="rotate(-90 50 50)"/>
+                        <text x="50" y="47" text-anchor="middle" font-size="12" font-weight="800" fill="#1e293b">@totalOrders</text>
+                        <text x="50" y="59" text-anchor="middle" font-size="6.5" fill="#94a3b8">orders</text>
+                    </svg>
+                    <div class="donut-legend">
+                        <div class="dl-row"><span class="dl-dot" style="background:#f59e0b"></span><span class="dl-name">Pending</span><span class="dl-val">@pendingOrders</span></div>
+                        <div class="dl-row"><span class="dl-dot" style="background:#3b82f6"></span><span class="dl-name">Processing</span><span class="dl-val">@processingOrders</span></div>
+                        <div class="dl-row"><span class="dl-dot" style="background:#10b981"></span><span class="dl-name">Shipped</span><span class="dl-val">@shippedOrders</span></div>
+                        <div class="dl-row"><span class="dl-dot" style="background:#ef4444"></span><span class="dl-name">Cancelled</span><span class="dl-val">@cancelledOrders</span></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Monthly Goals -->
+            <div class="side-box">
+                <h4 class="side-box-title">Monthly Goals</h4>
+                <p class="side-box-sub">Progress toward targets</p>
+                <div class="goals-stack">
+                    <div class="goal-row">
+                        <div class="gr-head"><span>Revenue Target</span><span class="gr-pct" style="color:#10b981">@(Math.Min(100,(int)(allTimeRevenue/6000m)))%</span></div>
+                        <div class="gr-bg"><div class="gr-fill" style="width:@(Math.Min(100,(int)(allTimeRevenue/6000m)))%;background:linear-gradient(90deg,#34d399,#10b981)"></div></div>
+                    </div>
+                    <div class="goal-row">
+                        <div class="gr-head"><span>Orders Fulfilled</span><span class="gr-pct" style="color:#3b82f6">@(Math.Min(100,(int)((double)shippedOrders/Math.Max(1,totalOrders)*100)))%</span></div>
+                        <div class="gr-bg"><div class="gr-fill" style="width:@(Math.Min(100,(int)((double)shippedOrders/Math.Max(1,totalOrders)*100)))%;background:linear-gradient(90deg,#60a5fa,#3b82f6)"></div></div>
+                    </div>
+                    <div class="goal-row">
+                        <div class="gr-head"><span>Ticket Resolution</span><span class="gr-pct" style="color:#8b5cf6">@(totalTickets>0?Math.Min(100,(int)((double)(resolvedTickets+closedTickets)/totalTickets*100)):0)%</span></div>
+                        <div class="gr-bg"><div class="gr-fill" style="width:@(totalTickets>0?Math.Min(100,(int)((double)(resolvedTickets+closedTickets)/totalTickets*100)):0)%;background:linear-gradient(90deg,#a78bfa,#8b5cf6)"></div></div>
+                    </div>
+                    <div class="goal-row">
+                        <div class="gr-head"><span>Stock Availability</span><span class="gr-pct" style="color:#f59e0b">@(totalProducts>0?Math.Min(100,(int)((double)(totalProducts-outOfStockCount)/Math.Max(1,totalProducts)*100)):100)%</span></div>
+                        <div class="gr-bg"><div class="gr-fill" style="width:@(totalProducts>0?Math.Min(100,(int)((double)(totalProducts-outOfStockCount)/Math.Max(1,totalProducts)*100)):100)%;background:linear-gradient(90deg,#fbbf24,#f59e0b)"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    }
+
+    <!-- ===== MID ROW: Top Products + Ticket Pipeline + Recent Orders ===== -->
+    <div class="mid-grid">
+        <!-- Top Products with mini bars -->
+        <div class="panel-card">
+            <div class="panel-header"><h3 class="panel-title">Inventory &amp; Stock Alerts</h3><a href="/admin/inventory" class="panel-link">View All</a></div>
+            <div class="panel-list">
+                @if (lowStockProducts != null && lowStockProducts.Any())
+                {
+                    @foreach (var p in pagedLowStockProducts)
+                    {
+                        <div class="prd-row">
+                            <div class="prd-icon @(p.StockQuantity==0?"prd-ico-r":"prd-ico-a")">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                            </div>
+                            <div class="prd-info"><p class="prd-name">@p.Name</p><p class="prd-cat">@p.Category</p></div>
+                            <div class="prd-bar-wrap">
+                                <div class="prd-bar-bg"><div class="prd-bar-fill" style="width:@(Math.Min(100,(int)((double)p.StockQuantity/Math.Max(1,50)*100)))%;background:@(p.StockQuantity==0?"#ef4444":p.StockQuantity<5?"#f59e0b":"#10b981")"></div></div>
+                                <span class="prd-qty @(p.StockQuantity==0?"prd-qty-r":"prd-qty-a")">@(p.StockQuantity==0?"Out":"@p.StockQuantity left")</span>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="panel-empty">All products are well-stocked ✓</div>
+                }
+            </div>
+            @if (lowStockProducts != null && lowStockProducts.Any())
+            {
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:.5rem 1.25rem .9rem;">
+                    <span style="font-size:.7rem; color:#94a3b8;">Showing @lowStockStartIndex-@lowStockEndIndex of @lowStockProducts.Count · Page @lowStockPage/@lowStockTotalPages</span>
+                    <div style="display:flex; gap:.4rem;">
+                        <button type="button" @onclick="PreviousLowStockPage" disabled="@(lowStockPage <= 1)" class="dash-btn-secondary" style="padding:.25rem .65rem; font-size:.7rem;">Previous</button>
+                        <button type="button" @onclick="NextLowStockPage" disabled="@(lowStockPage >= lowStockTotalPages)" class="dash-btn-secondary" style="padding:.25rem .65rem; font-size:.7rem;">Next</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Ticket Pipeline -->
+        <div class="panel-card">
+            <div class="panel-header"><h3 class="panel-title">Support Pipeline</h3><a href="/admin/escalations" class="panel-link">View All</a></div>
+            <div style="padding:1rem 1.25rem">
+                <div class="pipe-stages">
+                    <div class="pipe-stage"><div class="pipe-num" style="color:#f59e0b;border-color:#fde68a">@openTickets</div><div class="pipe-lbl">Open</div></div>
+                    <div class="pipe-arrow">›</div>
+                    <div class="pipe-stage"><div class="pipe-num" style="color:#3b82f6;border-color:#bfdbfe">@inProgressTickets</div><div class="pipe-lbl">In Progress</div></div>
+                    <div class="pipe-arrow">›</div>
+                    <div class="pipe-stage"><div class="pipe-num" style="color:#ef4444;border-color:#fecaca">@escalatedTickets</div><div class="pipe-lbl">Escalated</div></div>
+                    <div class="pipe-arrow">›</div>
+                    <div class="pipe-stage"><div class="pipe-num" style="color:#10b981;border-color:#a7f3d0">@resolvedTickets</div><div class="pipe-lbl">Resolved</div></div>
+                    <div class="pipe-arrow">›</div>
+                    <div class="pipe-stage"><div class="pipe-num" style="color:#94a3b8;border-color:#e2e8f0">@closedTickets</div><div class="pipe-lbl">Closed</div></div>
+                </div>
+                @if (totalTickets > 0)
+                {
+                    <div class="pipe-bar">
+                        <div style="width:@(SafePercent(openTickets,totalTickets))%;background:#f59e0b;height:6px;border-radius:3px 0 0 3px"></div>
+                        <div style="width:@(SafePercent(inProgressTickets,totalTickets))%;background:#3b82f6;height:6px"></div>
+                        <div style="width:@(SafePercent(escalatedTickets,totalTickets))%;background:#ef4444;height:6px"></div>
+                        <div style="width:@(SafePercent(resolvedTickets,totalTickets))%;background:#10b981;height:6px"></div>
+                        <div style="width:@(SafePercent(closedTickets,totalTickets))%;background:#e2e8f0;height:6px;border-radius:0 3px 3px 0"></div>
+                    </div>
+                }
+                <div style="margin-top:1rem;display:flex;flex-direction:column;gap:0.5rem">
+                    <div class="tkt-stat-row"><span class="tkt-dot" style="background:#f59e0b"></span><span class="tkt-lbl">Total Tickets</span><span class="tkt-val">@totalTickets</span></div>
+                    <div class="tkt-stat-row"><span class="tkt-dot" style="background:#ef4444"></span><span class="tkt-lbl">Escalated (Urgent)</span><span class="tkt-val tkt-alert">@escalatedTickets</span></div>
+                    <div class="tkt-stat-row"><span class="tkt-dot" style="background:#10b981"></span><span class="tkt-lbl">Resolution Rate</span><span class="tkt-val">@(totalTickets>0?((resolvedTickets+closedTickets)*100/Math.Max(1,totalTickets)):0)%</span></div>
+                    <div class="tkt-stat-row"><span class="tkt-dot" style="background:#8b5cf6"></span><span class="tkt-lbl">Today's Revenue</span><span class="tkt-val" style="color:#059669">&#8369;@totalRevenue.ToString("N0")</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Orders -->
+        <div class="panel-card">
+            <div class="panel-header"><h3 class="panel-title">Recent Orders</h3><a href="/admin/orders" class="panel-link">View All</a></div>
+            <div class="panel-list">
+                @if (recentOrders != null && recentOrders.Any())
+                {
+                    @foreach (var o in pagedRecentOrders)
+                    {
+                        <div class="panel-item">
+                            <div class="panel-item-left">
+                                <div class="panel-item-icon @GetOrderStatusIconClass(o.Status)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                                </div>
+                                <div><p class="panel-item-title">@o.OrderNumber</p><p class="panel-item-sub">@o.OrderDate.ToString("MMM dd") · ₱@o.TotalAmount.ToString("N0")</p></div>
+                            </div>
+                            <span class="status-badge @GetOrderStatusClass(o.Status)">@o.Status</span>
+                        </div>
+                    }
+                }
+                else { <div class="panel-empty">No recent orders</div> }
+            </div>
+            @if (recentOrders != null && recentOrders.Any())
+            {
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:.5rem 1.25rem .9rem;">
+                    <span style="font-size:.7rem; color:#94a3b8;">Showing @ordersStartIndex-@ordersEndIndex of @recentOrders.Count · Page @ordersPage/@ordersTotalPages</span>
+                    <div style="display:flex; gap:.4rem;">
+                        <button type="button" @onclick="PreviousOrdersPage" disabled="@(ordersPage <= 1)" class="dash-btn-secondary" style="padding:.25rem .65rem; font-size:.7rem;">Previous</button>
+                        <button type="button" @onclick="NextOrdersPage" disabled="@(ordersPage >= ordersTotalPages)" class="dash-btn-secondary" style="padding:.25rem .65rem; font-size:.7rem;">Next</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- ===== REFUND REQUESTS ===== -->
+    <div class="panel-card">
+        <div class="panel-header">
+            <h3 class="panel-title">Pending Refund Requests</h3>
+            <a href="/admin/orders?focus=refunds#refund-requests" class="panel-link">Open Refund Table</a>
+        </div>
+        <div class="panel-list">
+            @if (pendingRefundRequests.Any())
+            {
+                @foreach (var request in pendingRefundRequests.Take(8))
+                {
+                    <div class="panel-item">
+                        <div class="panel-item-left">
+                            <div class="panel-item-icon panel-icon-red">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="panel-item-title">@request.OrderNumber · ₱@request.TotalAmount.ToString("N2")</p>
+                                <p class="panel-item-sub">@request.RequestedByName · @request.CreatedAt.ToString("MMM dd, HH:mm")</p>
+                                @if (!string.IsNullOrWhiteSpace(request.Reason))
+                                {
+                                    <p class="panel-item-sub">Reason: @request.Reason</p>
+                                }
+                            </div>
+                        </div>
+                        <a href="/admin/orders?focus=refunds#refund-requests" class="dash-btn-secondary" style="padding:.25rem .65rem; font-size:.7rem;">Request for Refund</a>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="panel-empty">No pending refund requests</div>
+            }
+        </div>
+    </div>
+
+    <!-- ===== MANAGEMENT TOOLS ===== -->
+    <div class="section-header"><h2 class="section-title">Management Tools</h2><p class="section-desc">Quick access to core admin functions</p></div>
+    <div class="mgmt-grid">
+        <a href="/admin/users" class="mgmt-card mgmt-card-indigo">
+            <div class="mgmt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg></div>
+            <div class="mgmt-body"><h3 class="mgmt-title">User Management</h3><p class="mgmt-desc">Supervisors, Agents &amp; roles</p></div>
+            <div class="mgmt-stat">@totalStaff users</div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mgmt-arrow"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </a>
+        <a href="/admin/inventory" class="mgmt-card mgmt-card-amber">
+            <div class="mgmt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg></div>
+            <div class="mgmt-body"><h3 class="mgmt-title">Product &amp; Catalog</h3><p class="mgmt-desc">Dress, Shirt, Jacket &amp; pricing</p></div>
+            <div class="mgmt-stat">@totalProducts items</div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mgmt-arrow"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </a>
+        <a href="/admin/orders" class="mgmt-card mgmt-card-blue">
+            <div class="mgmt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg></div>
+            <div class="mgmt-body"><h3 class="mgmt-title">Order Management</h3><p class="mgmt-desc">Approve/reject, handle returns</p></div>
+            <div class="mgmt-stat">@pendingOrders pending</div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mgmt-arrow"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </a>
+        <a href="/admin/escalations" class="mgmt-card mgmt-card-red">
+            <div class="mgmt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>
+            <div class="mgmt-body"><h3 class="mgmt-title">Ticket Oversight</h3><p class="mgmt-desc">Monitor escalations, reassign</p></div>
+            <div class="mgmt-stat mgmt-stat-alert">@escalatedTickets escalated</div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mgmt-arrow"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </a>
+    </div>
+
+    <!-- Role Boundary Notice -->
+    <div class="role-notice">
+        <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        <span>Admins can create Supervisors and manage Agents. Full control over products, inventory, and finances. Super Admin access is restricted.</span>
+    </div>
+
+</div>
+
+<style>
+    /* ===== Container ===== */
+    .dash-container { padding:1.5rem; max-width:1560px; margin:0 auto; display:flex; flex-direction:column; gap:1.5rem; }
+    @@media (min-width:1024px) { .dash-container { padding:2rem; gap:1.75rem; } }
+
+    /* ===== Header ===== */
+    .dash-header { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:1rem; }
+    .dash-header-title-row { display:flex; align-items:center; gap:0.75rem; }
+    .dash-title { font-size:1.5rem; font-weight:800; color:#1e293b; letter-spacing:-0.025em; margin:0; }
+    @@media (min-width:1024px) { .dash-title { font-size:1.75rem; } }
+    .dash-role-badge { padding:0.25rem 0.75rem; border-radius:999px; font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; background:linear-gradient(135deg,#eef2ff,#e0e7ff); color:#4338ca; border:1px solid #c7d2fe; }
+    .dash-subtitle { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; font-size:0.8125rem; color:#64748b; margin-top:0.375rem; }
+    .dash-subtitle svg { color:#94a3b8; width:1rem; height:1rem; }
+    .dash-subtitle-sep { color:#cbd5e1; }
+    .dash-header-actions { display:flex; align-items:center; gap:0.625rem; }
+    .dash-btn-secondary { display:inline-flex; align-items:center; gap:0.375rem; padding:0.5rem 1rem; border-radius:0.75rem; font-size:0.8125rem; font-weight:600; background:white; color:#475569; border:1px solid #e2e8f0; cursor:pointer; transition:all 0.15s; text-decoration:none; }
+    .dash-btn-secondary:hover { background:#f8fafc; border-color:#cbd5e1; color:#1e293b; }
+    .dash-btn-secondary:disabled { opacity:0.5; cursor:not-allowed; }
+    .dash-btn-primary { display:inline-flex; align-items:center; gap:0.375rem; padding:0.5rem 1rem; border-radius:0.75rem; font-size:0.8125rem; font-weight:600; background:#4338ca; color:white; border:1px solid #4338ca; cursor:pointer; transition:all 0.15s; text-decoration:none; }
+    .dash-btn-primary:hover { background:#3730a3; }
+
+    /* ===== Stat Cards ===== */
+    .sc-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; align-items:stretch; }
+    @@media (max-width:1280px) { .sc-grid { grid-template-columns:repeat(2,1fr); } }
+    @@media (max-width:640px) { .sc-grid { grid-template-columns:1fr; } }
+    .sc-grid > * { height:100%; }
+    .sc-card { background:white; border:1px solid var(--card-border-color, #e2e8f0); border-radius:var(--card-radius, 1rem); padding:1.25rem 1.25rem 0; display:flex; flex-direction:column; box-shadow:var(--card-shadow, 0 1px 4px rgba(0,0,0,.05)); transition:all .2s; overflow:hidden; min-height:var(--card-min-height-sm, 170px); height:100%; }
+    .sc-card:hover { border-color:#e2e8f0; box-shadow:var(--card-shadow-hover, 0 8px 18px rgba(0,0,0,.09)); transform:translateY(-2px); }
+    .sc-card-link { text-decoration:none; color:inherit; }
+    .sc-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:.75rem; }
+    .sc-label { font-size:.75rem; font-weight:600; color:#94a3b8; margin:0 0 .25rem; text-transform:uppercase; letter-spacing:.04em; }
+    .sc-val { font-size:1.875rem; font-weight:800; color:#0f172a; letter-spacing:-.03em; margin:0 0 .375rem; line-height:1.1; }
+    .sc-chg { display:inline-flex; align-items:center; gap:.25rem; font-size:.72rem; font-weight:600; }
+    .sc-up { color:#10b981; } .sc-dn { color:#ef4444; }
+    .sc-subchips { margin-top:.45rem; display:flex; flex-wrap:wrap; gap:.35rem; }
+    .sc-chip { display:inline-flex; align-items:center; padding:.15rem .5rem; border-radius:999px; font-size:.65rem; font-weight:700; text-decoration:none; }
+    .sc-chip-rose { background:#fff1f2; color:#be123c; border:1px solid #fecdd3; }
+    .sc-chip-rose:hover { background:#ffe4e6; color:#9f1239; }
+    .sc-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .sc-icon-g { background:#ecfdf5; color:#059669; } .sc-icon-b { background:#eff6ff; color:#2563eb; }
+    .sc-icon-v { background:#f5f3ff; color:#7c3aed; } .sc-icon-a { background:#fffbeb; color:#d97706; }
+    .sc-spark { width:calc(100% + 2.5rem); margin:0 -1.25rem; height:50px; display:block; }
+
+    /* ===== Analytics Row ===== */
+    .an-row { display:grid; grid-template-columns:1fr 320px; gap:1rem; align-items:stretch; }
+    @@media (max-width:1200px) { .an-row { grid-template-columns:1fr; } }
+    .an-chart-card { background:white; border:1px solid var(--card-border-color, #e2e8f0); border-radius:var(--card-radius, 1rem); padding:1.375rem 1.375rem 1rem; box-shadow:var(--card-shadow, 0 1px 4px rgba(0,0,0,.05)); height:100%; }
+    .an-chart-head { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1.25rem; gap:1rem; flex-wrap:wrap; }
+    .an-chart-title { font-size:1rem; font-weight:700; color:#1e293b; margin:0 0 .2rem; }
+    .an-chart-sub { font-size:.75rem; color:#94a3b8; margin:0; }
+    .an-tabs { display:flex; gap:.25rem; background:#f8fafc; padding:.25rem; border-radius:.625rem; border:1px solid #f1f5f9; }
+    .an-tab { padding:.3rem .75rem; border-radius:.375rem; border:none; background:transparent; font-size:.8rem; font-weight:600; color:#94a3b8; cursor:pointer; transition:all .15s; }
+    .an-tab:hover { color:#475569; }
+    .an-tab-on { background:white; color:#1e293b; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+    .an-chart-body { display:flex; gap:.5rem; align-items:stretch; }
+    .an-ylabels { display:flex; flex-direction:column; justify-content:space-between; font-size:.6875rem; color:#cbd5e1; text-align:right; width:36px; flex-shrink:0; padding-bottom:1.5rem; }
+    .an-chartarea { flex:1; min-width:0; }
+    .an-xlabels { display:flex; justify-content:space-between; font-size:.6875rem; color:#cbd5e1; margin-top:.4rem; padding:0 2px; }
+    .an-right { display:flex; flex-direction:column; gap:1rem; }
+    .side-box { background:white; border:1px solid var(--card-border-color, #e2e8f0); border-radius:var(--card-radius, 1rem); padding:1.25rem; box-shadow:var(--card-shadow, 0 1px 4px rgba(0,0,0,.05)); min-height:var(--card-min-height-sm, 170px); }
+    .side-box-title { font-size:.9375rem; font-weight:700; color:#1e293b; margin:0 0 .1rem; }
+    .side-box-sub { font-size:.75rem; color:#94a3b8; margin:0 0 1rem; }
+    .donut-row { display:flex; gap:1rem; align-items:center; }
+    .donut-legend { flex:1; display:flex; flex-direction:column; gap:.5rem; }
+    .dl-row { display:flex; align-items:center; gap:.5rem; }
+    .dl-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .dl-name { flex:1; font-size:.8rem; color:#475569; }
+    .dl-val { font-size:.8rem; font-weight:700; color:#1e293b; }
+    .goals-stack { display:flex; flex-direction:column; gap:.75rem; }
+    .goal-row { display:flex; flex-direction:column; gap:.3rem; }
+    .gr-head { display:flex; justify-content:space-between; font-size:.78rem; font-weight:600; color:#475569; }
+    .gr-pct { font-weight:700; }
+    .gr-bg { height:7px; border-radius:4px; background:#f1f5f9; overflow:hidden; }
+    .gr-fill { height:100%; border-radius:4px; min-width:3px; transition:width .6s ease; }
+
+    /* ===== Mid Grid ===== */
+    .mid-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; align-items:stretch; }
+    @@media (max-width:1200px) { .mid-grid { grid-template-columns:1fr; } }
+    @@media (max-width:1440px) and (min-width:1201px) { .mid-grid { grid-template-columns:repeat(2,1fr); } }
+    .mid-grid > * { height:100%; }
+    .panel-card { background:white; border:1px solid var(--card-border-color, #e2e8f0); border-radius:var(--card-radius, 1rem); box-shadow:var(--card-shadow, 0 1px 4px rgba(0,0,0,.05)); overflow:hidden; height:100%; min-height:var(--card-min-height-md, 210px); }
+    .panel-header { display:flex; align-items:center; justify-content:space-between; padding:1.125rem 1.25rem .75rem; border-bottom:1px solid #f8fafc; }
+    .panel-title { font-size:.9375rem; font-weight:700; color:#1e293b; margin:0; }
+    .panel-link { font-size:.75rem; font-weight:600; color:#4338ca; text-decoration:none; }
+    .panel-link:hover { color:#3730a3; }
+    .panel-list { display:flex; flex-direction:column; max-height:340px; overflow-y:auto; }
+    .panel-list::-webkit-scrollbar { width:4px; }
+    .panel-list::-webkit-scrollbar-track { background:transparent; }
+    .panel-list::-webkit-scrollbar-thumb { background:#e2e8f0; border-radius:2px; }
+    .panel-item { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; padding:.75rem 1.25rem; border-bottom:1px solid #f8fafc; transition:background .15s; }
+    .panel-item:last-child { border-bottom:none; }
+    .panel-item:hover { background:#fafbff; }
+    .panel-item-left { display:flex; align-items:center; gap:.625rem; flex:1; min-width:0; }
+    .panel-item-icon { width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .panel-item-title { font-size:.825rem; font-weight:600; color:#1e293b; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .panel-item-sub { font-size:.73rem; color:#94a3b8; margin:0; }
+    .panel-empty { padding:2rem 1.25rem; text-align:center; font-size:.8rem; color:#94a3b8; }
+    .panel-icon-indigo { background:#eef2ff; color:#4338ca; }
+    .panel-icon-amber { background:#fffbeb; color:#d97706; }
+    .panel-icon-emerald { background:#ecfdf5; color:#059669; }
+    .panel-icon-blue { background:#eff6ff; color:#2563eb; }
+    .panel-icon-red { background:#fef2f2; color:#dc2626; }
+
+    /* ===== Inventory product rows ===== */
+    .prd-row { display:flex; align-items:center; gap:.625rem; padding:.625rem 1.25rem; border-bottom:1px solid #f8fafc; }
+    .prd-row:last-child { border-bottom:none; }
+    .prd-icon { width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .prd-ico-r { background:#fef2f2; color:#dc2626; } .prd-ico-a { background:#fffbeb; color:#d97706; }
+    .prd-info { flex:1; min-width:0; }
+    .prd-name { font-size:.8rem; font-weight:600; color:#1e293b; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .prd-cat { font-size:.7rem; color:#94a3b8; margin:0; }
+    .prd-bar-wrap { display:flex; align-items:center; gap:.5rem; width:100px; flex-shrink:0; }
+    .prd-bar-bg { flex:1; height:5px; border-radius:3px; background:#f1f5f9; overflow:hidden; }
+    .prd-bar-fill { height:100%; border-radius:3px; min-width:2px; }
+    .prd-qty { font-size:.7rem; font-weight:700; white-space:nowrap; }
+    .prd-qty-r { color:#dc2626; } .prd-qty-a { color:#d97706; }
+
+    /* ===== Ticket Pipeline ===== */
+    .pipe-stages { display:flex; align-items:center; gap:.25rem; flex-wrap:wrap; margin-bottom:.75rem; }
+    .pipe-stage { display:flex; flex-direction:column; align-items:center; gap:.25rem; flex:1; min-width:0; }
+    .pipe-num { font-size:1.25rem; font-weight:800; width:42px; height:42px; border-radius:50%; border:2px solid; display:flex; align-items:center; justify-content:center; line-height:1; }
+    .pipe-lbl { font-size:.65rem; font-weight:600; color:#94a3b8; text-align:center; }
+    .pipe-arrow { font-size:1.25rem; color:#cbd5e1; flex-shrink:0; line-height:1; margin-bottom:1.25rem; }
+    .pipe-bar { display:flex; border-radius:3px; overflow:hidden; height:6px; margin-bottom:.75rem; }
+    .tkt-stat-row { display:flex; align-items:center; gap:.5rem; }
+    .tkt-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .tkt-lbl { flex:1; font-size:.8rem; color:#475569; }
+    .tkt-val { font-size:.8rem; font-weight:700; color:#1e293b; }
+    .tkt-alert { color:#ef4444; }
+
+    /* ===== Status badges ===== */
+    .status-badge { font-size:.7rem; font-weight:700; padding:.2rem .6rem; border-radius:999px; white-space:nowrap; flex-shrink:0; }
+    .status-pending { background:#fffbeb; color:#b45309; }
+    .status-processing { background:#eff6ff; color:#1d4ed8; }
+    .status-shipped { background:#ecfdf5; color:#065f46; }
+    .status-cancelled { background:#fef2f2; color:#dc2626; }
+
+    /* ===== Audit Trail ===== */
+    .audit-meta { display:flex; flex-direction:column; align-items:flex-end; gap:.1rem; flex-shrink:0; }
+    .audit-user { font-size:.7rem; font-weight:600; color:#64748b; }
+    .audit-time { font-size:.65rem; color:#94a3b8; }
+
+    /* ===== Management Tools Grid ===== */
+    .section-header { display:flex; flex-direction:column; gap:.125rem; }
+    .section-title { font-size:1.125rem; font-weight:700; color:#1e293b; margin:0; }
+    .section-desc { font-size:.8125rem; color:#94a3b8; margin:0; }
+    .mgmt-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; align-items:stretch; }
+    @@media (max-width:1200px) { .mgmt-grid { grid-template-columns:repeat(2,1fr); } }
+    @@media (max-width:640px) { .mgmt-grid { grid-template-columns:1fr; } }
+    .mgmt-grid > * { height:100%; }
+    .mgmt-card { display:flex; align-items:center; gap:.875rem; padding:1.125rem 1.25rem; border-radius:var(--card-radius, 1rem); border:1px solid var(--card-border-color, #e2e8f0); text-decoration:none; transition:all .2s; background:white; box-shadow:var(--card-shadow, 0 1px 4px rgba(0,0,0,.05)); min-height:var(--card-min-height-sm, 170px); height:100%; }
+    .mgmt-card:hover { box-shadow:var(--card-shadow-hover, 0 8px 18px rgba(0,0,0,.09)); transform:translateY(-2px); }
+    .mgmt-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .mgmt-body { flex:1; min-width:0; }
+    .mgmt-title { font-size:.875rem; font-weight:700; color:#1e293b; margin:0; }
+    .mgmt-desc { font-size:.73rem; color:#94a3b8; margin:.1rem 0 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .mgmt-stat { font-size:.73rem; font-weight:700; color:#64748b; white-space:nowrap; }
+    .mgmt-stat-alert { color:#dc2626; }
+    .mgmt-arrow { width:16px; height:16px; color:#cbd5e1; flex-shrink:0; }
+    .mgmt-card-indigo .mgmt-icon { background:#eef2ff; color:#4338ca; }
+    .mgmt-card-indigo:hover { border-color:#c7d2fe; }
+    .mgmt-card-amber .mgmt-icon { background:#fffbeb; color:#d97706; }
+    .mgmt-card-amber:hover { border-color:#fde68a; }
+    .mgmt-card-blue .mgmt-icon { background:#eff6ff; color:#2563eb; }
+    .mgmt-card-blue:hover { border-color:#bfdbfe; }
+    .mgmt-card-red .mgmt-icon { background:#fef2f2; color:#dc2626; }
+    .mgmt-card-red:hover { border-color:#fecaca; }
+
+    /* ===== System & Audit Row ===== */
+    .sys-audit-row { display:grid; grid-template-columns:1fr 340px; gap:1rem; align-items:stretch; }
+    @@media (max-width:1200px) { .sys-audit-row { grid-template-columns:1fr; } }
+    .sys-mini-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; align-items:stretch; }
+    .sys-mini-grid > * { height:100%; }
+    .sys-card { background:white; border:1px solid var(--card-border-color, #e2e8f0); border-radius:var(--card-radius, 1rem); padding:1.25rem; box-shadow:var(--card-shadow, 0 1px 4px rgba(0,0,0,.05)); display:flex; flex-direction:column; gap:.4rem; text-decoration:none; transition:all .2s; min-height:var(--card-min-height-sm, 170px); height:100%; }
+    .sys-card-link:hover { border-color:#e2e8f0; box-shadow:var(--card-shadow-hover, 0 8px 18px rgba(0,0,0,.09)); transform:translateY(-1px); }
+    .sys-icon { width:36px; height:36px; border-radius:9px; display:flex; align-items:center; justify-content:center; margin-bottom:.25rem; }
+    .sys-icon-emerald { background:#ecfdf5; color:#059669; } .sys-icon-indigo { background:#eef2ff; color:#4338ca; }
+    .sys-icon-amber { background:#fffbeb; color:#d97706; } .sys-icon-violet { background:#f5f3ff; color:#7c3aed; }
+    .sys-title { font-size:.875rem; font-weight:700; color:#1e293b; margin:0; }
+    .sys-stat { font-size:.75rem; font-weight:600; color:#64748b; }
+    .sys-desc { font-size:.72rem; color:#94a3b8; margin:0; }
+    .sys-status { display:inline-flex; align-items:center; gap:.375rem; font-size:.75rem; font-weight:600; }
+    .sys-status-ok { color:#059669; } .sys-status-err { color:#dc2626; }
+    .sys-status-dot { width:7px; height:7px; border-radius:50%; animation:pulse 2s infinite; }
+    .sys-dot-ok { background:#10b981; } .sys-dot-err { background:#ef4444; }
+    @@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(.9)} }
+
+    /* ===== Role notice ===== */
+    .role-notice { display:flex; align-items:center; gap:.625rem; padding:.875rem 1.125rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:.875rem; font-size:.78rem; color:#64748b; }
+
+    /* ===== Utility icon sizes ===== */
+    .w-4 { width:1rem; } .h-4 { height:1rem; }
+    .w-5 { width:1.25rem; } .h-5 { height:1.25rem; }
+    .w-6 { width:1.5rem; } .h-6 { height:1.5rem; }
+    .animate-spin { animation:spin 1s linear infinite; }
+    @@keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+</style>
+
+
+@code {
+    private string? loadError;
+    private bool canViewAdminAnalytics;
+
+    private bool isLoading = true;
+
+
+
+    // ===== KPI Metrics =====
+
+    // Tickets
+
+    private int totalTickets = 0;
+
+    private int openTickets = 0;
+
+    private int inProgressTickets = 0;
+
+    private int resolvedTickets = 0;
+
+    private int escalatedTickets = 0;
+
+    private int closedTickets = 0;
+
+
+
+    // Orders
+
+    private int totalOrders = 0;
+
+    private int pendingOrders = 0;
+
+    private int processingOrders = 0;
+
+    private int shippedOrders = 0;
+
+    private int cancelledOrders = 0;
+
+
+
+    // Financial
+
+    private decimal totalRevenue = 0;
+
+    private decimal weeklyRevenue = 0;
+
+    private decimal allTimeRevenue = 0;
+
+    private decimal cancelledValue = 0;
+
+    private decimal revenueChangePercent = 0;
+    private decimal revenueMonthChangePercent = 0;
+    private decimal ordersMonthChangePercent = 0;
+
+
+
+    // Inventory
+
+    private int totalProducts = 0;
+
+    private int lowStockCount = 0;
+
+    private int outOfStockCount = 0;
+
+
+
+    // Team
+
+    private int totalStaff = 0;
+
+    private int supervisorCount = 0;
+
+    private int agentCount = 0;
+
+
+
+    // System
+
+    private string erpSyncStatus = "Checking...";
+
+    private int recentAuditLogCount = 0;
+
+
+
+    // Data lists
+
+    private List<Order>? recentOrders;
+
+    private List<Product>? lowStockProducts;
+
+    private List<AuditLog>? recentAuditLogs;
+    private List<PendingRefundRequest> pendingRefundRequests = new();
+    private int lowStockPage = 1;
+    private int ordersPage = 1;
+    private int auditPage = 1;
+    private const int lowStockPageSize = 7;
+    private const int ordersPageSize = 7;
+    private const int auditPageSize = 6;
+    private int lowStockTotalPages => Math.Max(1, (int)Math.Ceiling((lowStockProducts?.Count ?? 0) / (double)lowStockPageSize));
+    private int ordersTotalPages => Math.Max(1, (int)Math.Ceiling((recentOrders?.Count ?? 0) / (double)ordersPageSize));
+    private int auditTotalPages => Math.Max(1, (int)Math.Ceiling((recentAuditLogs?.Count ?? 0) / (double)auditPageSize));
+    private List<Product> pagedLowStockProducts => (lowStockProducts ?? new())
+        .Skip((lowStockPage - 1) * lowStockPageSize)
+        .Take(lowStockPageSize)
+        .ToList();
+    private List<Order> pagedRecentOrders => (recentOrders ?? new())
+        .Skip((ordersPage - 1) * ordersPageSize)
+        .Take(ordersPageSize)
+        .ToList();
+    private List<AuditLog> pagedRecentAuditLogs => (recentAuditLogs ?? new())
+        .Skip((auditPage - 1) * auditPageSize)
+        .Take(auditPageSize)
+        .ToList();
+    private int lowStockStartIndex => (lowStockProducts?.Count ?? 0) == 0 ? 0 : ((lowStockPage - 1) * lowStockPageSize) + 1;
+    private int lowStockEndIndex => (lowStockProducts?.Count ?? 0) == 0 ? 0 : Math.Min(lowStockPage * lowStockPageSize, lowStockProducts!.Count);
+    private int ordersStartIndex => (recentOrders?.Count ?? 0) == 0 ? 0 : ((ordersPage - 1) * ordersPageSize) + 1;
+    private int ordersEndIndex => (recentOrders?.Count ?? 0) == 0 ? 0 : Math.Min(ordersPage * ordersPageSize, recentOrders!.Count);
+    private int auditStartIndex => (recentAuditLogs?.Count ?? 0) == 0 ? 0 : ((auditPage - 1) * auditPageSize) + 1;
+    private int auditEndIndex => (recentAuditLogs?.Count ?? 0) == 0 ? 0 : Math.Min(auditPage * auditPageSize, recentAuditLogs!.Count);
+    private string selectedChartMetric = "revenue";
+    private List<decimal> monthlyRevenueSeries = Enumerable.Repeat(0m, 12).ToList();
+    private List<decimal> monthlyOrdersSeries = Enumerable.Repeat(0m, 12).ToList();
+    private List<decimal> monthlyProfitSeries = Enumerable.Repeat(0m, 12).ToList();
+    private decimal chartSeriesMax = 1m;
+    private string chartLinePath = "M0 170 L600 170";
+    private string chartAreaPath = "M0 170 L600 170 L600 180 L0 180 Z";
+    private string chartSeriesColor = "#10b981";
+
+
+
+    protected override async Task OnInitializedAsync()
+
+    {
+
+        await LoadDashboardData();
+
+    }
+
+
+
+    private async Task LoadDashboardData()
+
+    {
+
+        isLoading = true;
+
+        try
+
+        {
+
+            // Fetch all data in parallel
+
+            var productsTask = _apiClient.GetProductsAsync();
+
+            var ordersTask = _apiClient.GetOrdersAsync();
+
+            var ticketsTask = _apiClient.GetTicketsAsync();
+
+            var usersTask = _apiClient.GetUsersAsync();
+
+            var auditLogsTask = _apiClient.GetAuditLogsAsync();
+            var pendingRefundsTask = _apiClient.GetPendingRefundRequestsAsync();
+
+            var erpSyncTask = DashboardService.GetErpSyncStatusAsync();
+            var moduleAccessTask = _apiClient.GetModuleAccessConfigAsync();
+            var subscriptionTask = _apiClient.GetMySubscriptionAsync();
+
+
+
+            await Task.WhenAll(productsTask, ordersTask, ticketsTask, usersTask, auditLogsTask, pendingRefundsTask, erpSyncTask, moduleAccessTask, subscriptionTask);
+
+
+
+            var products = await productsTask;
+
+            var orders = await ordersTask;
+
+            var tickets = await ticketsTask;
+
+            var users = await usersTask;
+
+            var auditLogs = await auditLogsTask;
+            pendingRefundRequests = (await pendingRefundsTask) ?? new List<PendingRefundRequest>();
+
+            erpSyncStatus = await erpSyncTask;
+            var moduleAccessConfig = await moduleAccessTask;
+            var tenantSubscription = await subscriptionTask;
+            canViewAdminAnalytics = ResolveAdminAnalyticsVisibility(moduleAccessConfig, tenantSubscription);
+
+
+
+            // ===== Process Tickets =====
+
+            if (tickets != null)
+
+            {
+
+                totalTickets = tickets.Count;
+
+                openTickets = tickets.Count(t => t.Status.Equals("Open", StringComparison.OrdinalIgnoreCase) || t.Status.Equals("New", StringComparison.OrdinalIgnoreCase));
+
+                inProgressTickets = tickets.Count(t => t.Status.Equals("InProgress", StringComparison.OrdinalIgnoreCase) || t.Status.Equals("In Progress", StringComparison.OrdinalIgnoreCase));
+
+                resolvedTickets = tickets.Count(t => t.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase));
+
+                escalatedTickets = tickets.Count(t => t.Status.Equals("Escalated", StringComparison.OrdinalIgnoreCase) || t.Priority.Equals("High", StringComparison.OrdinalIgnoreCase) || t.Priority.Equals("Critical", StringComparison.OrdinalIgnoreCase));
+
+                closedTickets = tickets.Count(t => t.Status.Equals("Closed", StringComparison.OrdinalIgnoreCase));
+
+            }
+
+
+
+            // ===== Process Orders =====
+
+            if (orders != null)
+
+            {
+
+                totalOrders = orders.Count;
+
+                pendingOrders = orders.Count(o => o.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase));
+
+                processingOrders = orders.Count(o => o.Status.Equals("Processing", StringComparison.OrdinalIgnoreCase));
+
+                shippedOrders = orders.Count(o => o.Status.Equals("Shipped", StringComparison.OrdinalIgnoreCase) || o.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase) || o.Status.Equals("Delivered", StringComparison.OrdinalIgnoreCase));
+
+                cancelledOrders = orders.Count(o => o.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) || o.Status.Equals("Returned", StringComparison.OrdinalIgnoreCase));
+
+
+
+                // Revenue calculations
+
+                var today = DateTime.Today;
+
+                var weekAgo = today.AddDays(-7);
+
+                var yesterday = today.AddDays(-1);
+
+
+
+                var activeOrders = orders.Where(o => !o.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)).ToList();
+
+                totalRevenue = activeOrders.Where(o => o.OrderDate.Date == today).Sum(o => o.TotalAmount);
+
+                weeklyRevenue = activeOrders.Where(o => o.OrderDate.Date >= weekAgo).Sum(o => o.TotalAmount);
+
+                allTimeRevenue = activeOrders.Sum(o => o.TotalAmount);
+
+                cancelledValue = orders.Where(o => o.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) || o.Status.Equals("Returned", StringComparison.OrdinalIgnoreCase)).Sum(o => o.TotalAmount);
+
+
+
+                var yesterdayRevenue = activeOrders.Where(o => o.OrderDate.Date == yesterday).Sum(o => o.TotalAmount);
+
+                revenueChangePercent = yesterdayRevenue > 0 ? ((totalRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 : 0;
+
+                var monthStart = new DateTime(today.Year, today.Month, 1);
+                var prevMonthStart = monthStart.AddMonths(-1);
+
+                var thisMonthRevenue = activeOrders.Where(o => o.OrderDate >= monthStart).Sum(o => o.TotalAmount);
+                var prevMonthRevenue = activeOrders.Where(o => o.OrderDate >= prevMonthStart && o.OrderDate < monthStart).Sum(o => o.TotalAmount);
+                revenueMonthChangePercent = CalculatePercentChange(thisMonthRevenue, prevMonthRevenue);
+
+                var thisMonthOrders = orders.Count(o => o.OrderDate >= monthStart);
+                var prevMonthOrders = orders.Count(o => o.OrderDate >= prevMonthStart && o.OrderDate < monthStart);
+                ordersMonthChangePercent = CalculatePercentChange(thisMonthOrders, prevMonthOrders);
+
+                BuildMonthlyChartSeries(orders, activeOrders, today.Year);
+                ApplySelectedChartSeries();
+
+
+
+                // Recent orders (sorted by date)
+
+                recentOrders = orders.OrderByDescending(o => o.OrderDate).ToList();
+                ordersPage = 1;
+
+            }
+
+
+
+            // ===== Process Products =====
+
+            if (products != null)
+
+            {
+
+                totalProducts = products.Count;
+
+                lowStockCount = products.Count(p => p.StockQuantity > 0 && p.StockQuantity <= 10);
+
+                outOfStockCount = products.Count(p => p.StockQuantity == 0);
+
+                lowStockProducts = products.Where(p => p.StockQuantity <= 10).OrderBy(p => p.StockQuantity).ToList();
+                lowStockPage = 1;
+
+            }
+
+
+
+            // ===== Process Users =====
+
+            if (users != null)
+
+            {
+
+                totalStaff = users.Count;
+
+                supervisorCount = users.Count(u => u.Role == UserRole.Supervisor);
+
+                agentCount = users.Count(u => u.Role == UserRole.Agent);
+
+            }
+
+
+
+            // ===== Process Audit Logs =====
+
+            if (auditLogs != null)
+
+            {
+
+                recentAuditLogs = auditLogs.OrderByDescending(a => a.Timestamp).ToList();
+                auditPage = 1;
+
+                recentAuditLogCount = auditLogs.Count;
+
+            }
+
+        }
+
+        catch (Exception ex)
+
+        {
+
+            loadError = $"Error loading dashboard data: {ex.Message}";
+
+            Console.WriteLine(loadError);
+
+        }
+
+        finally
+
+        {
+
+            isLoading = false;
+
+        }
+
+    }
+
+
+
+    private async Task RefreshData()
+
+    {
+
+        await LoadDashboardData();
+
+        StateHasChanged();
+
+    }
+
+
+
+    // ===== Helpers =====
+
+
+
+    private string SafePercent(int part, int whole)
+
+    {
+
+        if (whole <= 0) return "0";
+
+        return ((double)part / whole * 100).ToString("F1");
+
+    }
+
+
+
+    private string GetOrderStatusClass(string status) => status?.ToLower() switch
+
+    {
+
+        "pending" => "status-pending",
+
+        "processing" => "status-processing",
+
+        "shipped" or "completed" or "delivered" => "status-shipped",
+
+        "cancelled" or "returned" => "status-cancelled",
+
+        _ => "status-pending"
+
+    };
+
+
+
+    private string GetOrderStatusIconClass(string status) => status?.ToLower() switch
+
+    {
+
+        "pending" => "panel-icon-amber",
+
+        "processing" => "panel-icon-blue",
+
+        "shipped" or "completed" or "delivered" => "panel-icon-emerald",
+
+        "cancelled" or "returned" => "panel-icon-red",
+
+        _ => "panel-icon-blue"
+
+    };
+
+    private decimal CalculatePercentChange(decimal currentValue, decimal previousValue)
+    {
+        if (previousValue <= 0)
+        {
+            return currentValue > 0 ? 100m : 0m;
+        }
+
+        return ((currentValue - previousValue) / previousValue) * 100m;
+    }
+
+    private decimal CalculatePercentChange(int currentValue, int previousValue)
+        => CalculatePercentChange((decimal)currentValue, previousValue);
+
+    private void BuildMonthlyChartSeries(List<Order> orders, List<Order> activeOrders, int year)
+    {
+        monthlyRevenueSeries = Enumerable
+            .Range(1, 12)
+            .Select(month => activeOrders
+                .Where(o => o.OrderDate.Year == year && o.OrderDate.Month == month)
+                .Sum(o => o.TotalAmount))
+            .ToList();
+
+        monthlyOrdersSeries = Enumerable
+            .Range(1, 12)
+            .Select(month => (decimal)orders.Count(o => o.OrderDate.Year == year && o.OrderDate.Month == month))
+            .ToList();
+
+        monthlyProfitSeries = Enumerable
+            .Range(1, 12)
+            .Select(month => activeOrders
+                .Where(o => o.OrderDate.Year == year && o.OrderDate.Month == month)
+                .Sum(o => o.TotalAmount))
+            .ToList();
+    }
+
+    private void SetChartMetric(string metric)
+    {
+        selectedChartMetric = metric;
+        ApplySelectedChartSeries();
+    }
+
+    private void ApplySelectedChartSeries()
+    {
+        List<decimal> selectedSeries;
+        switch (selectedChartMetric)
+        {
+            case "orders":
+                selectedSeries = monthlyOrdersSeries;
+                chartSeriesColor = "#3b82f6";
+                break;
+            case "profit":
+                selectedSeries = monthlyProfitSeries;
+                chartSeriesColor = "#8b5cf6";
+                break;
+            default:
+                selectedSeries = monthlyRevenueSeries;
+                chartSeriesColor = "#10b981";
+                break;
+        }
+
+        var maxValue = selectedSeries.DefaultIfEmpty(0m).Max();
+        chartSeriesMax = RoundUpChartMax(maxValue);
+
+        var coordinates = new List<(double X, double Y)>();
+        for (var i = 0; i < selectedSeries.Count; i++)
+        {
+            var x = i * (600d / 11d);
+            var ratio = chartSeriesMax <= 0 ? 0 : (double)(selectedSeries[i] / chartSeriesMax);
+            var y = 165d - (ratio * 155d);
+            y = Math.Clamp(y, 8d, 165d);
+            coordinates.Add((x, y));
+        }
+
+        if (!coordinates.Any())
+        {
+            chartLinePath = "M0 170 L600 170";
+            chartAreaPath = "M0 170 L600 170 L600 180 L0 180 Z";
+            return;
+        }
+
+        var linePath = string.Join(" ",
+            coordinates.Select((p, idx) =>
+                $"{(idx == 0 ? "M" : "L")}{p.X.ToString("0.##", CultureInfo.InvariantCulture)} {p.Y.ToString("0.##", CultureInfo.InvariantCulture)}"));
+
+        chartLinePath = linePath;
+        chartAreaPath = $"{linePath} L600 180 L0 180 Z";
+    }
+
+    private decimal RoundUpChartMax(decimal value)
+    {
+        if (value <= 0) return 1000m;
+        var unit = value < 10000m ? 500m : 1000m;
+        return Math.Ceiling(value / unit) * unit;
+    }
+
+    private string FormatCompactPeso(decimal value)
+    {
+        if (value >= 1_000_000m)
+        {
+            return $"₱{(value / 1_000_000m).ToString("0.#", CultureInfo.InvariantCulture)}M";
+        }
+
+        if (value >= 1000m)
+        {
+            return $"₱{(value / 1000m).ToString("0.#", CultureInfo.InvariantCulture)}k";
+        }
+
+        return $"₱{value.ToString("0", CultureInfo.InvariantCulture)}";
+    }
+
+    private string FormatChartAxisValue(decimal value)
+    {
+        if (selectedChartMetric == "orders")
+        {
+            if (value >= 1000m)
+            {
+                return $"{(value / 1000m).ToString("0.#", CultureInfo.InvariantCulture)}k";
+            }
+
+            return Math.Round(value).ToString("0", CultureInfo.InvariantCulture);
+        }
+
+        return FormatCompactPeso(value);
+    }
+
+    private void PreviousLowStockPage()
+    {
+        if (lowStockPage <= 1) return;
+        lowStockPage--;
+    }
+
+    private void NextLowStockPage()
+    {
+        if (lowStockPage >= lowStockTotalPages) return;
+        lowStockPage++;
+    }
+
+    private void PreviousOrdersPage()
+    {
+        if (ordersPage <= 1) return;
+        ordersPage--;
+    }
+
+    private void NextOrdersPage()
+    {
+        if (ordersPage >= ordersTotalPages) return;
+        ordersPage++;
+    }
+
+    private void PreviousAuditPage()
+    {
+        if (auditPage <= 1) return;
+        auditPage--;
+    }
+
+    private void NextAuditPage()
+    {
+        if (auditPage >= auditTotalPages) return;
+        auditPage++;
+    }
+
+    private static bool ResolveAdminAnalyticsVisibility(
+        ModuleAccessConfig? moduleAccessConfig,
+        TenantSubscriptionModel? tenantSubscription)
+    {
+        var analyticsModule = moduleAccessConfig?.Modules.FirstOrDefault(m =>
+            string.Equals(m.ModuleKey, "reports", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(m.ModuleKey, "analytics", StringComparison.OrdinalIgnoreCase));
+
+        if (analyticsModule == null || !analyticsModule.IsEnabled || !analyticsModule.RoleAccess.Admin)
+        {
+            return false;
+        }
+
+        return ModuleVisibilityHelper.IsAllowedBySubscription("reports", tenantSubscription);
+    }
+}

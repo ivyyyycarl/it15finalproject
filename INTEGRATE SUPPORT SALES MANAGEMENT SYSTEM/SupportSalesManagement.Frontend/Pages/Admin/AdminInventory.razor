@@ -1,0 +1,274 @@
+@page "/admin/inventory"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Inventory Management - Admin</PageTitle>
+
+<div class="space-y-6 p-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Inventory Management</h1>
+            <p class="text-gray-500">Manage product stock, prices, and variants.</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 flex items-center justify-center">
+            <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-classic-teal mb-4"></div>
+                <p class="text-gray-500">Loading products...</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Inventory Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-4 border-b border-gray-100 flex items-center gap-4">
+                <div class="relative flex-1">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </span>
+                    <input type="text" placeholder="Search SKU, Name, or Category..."
+                        @bind="searchTerm" @bind:event="oninput" @bind:after="FilterProducts"
+                        class="pl-10 pr-4 py-2 w-full border border-gray-200 rounded-lg focus:ring-2 focus:ring-classic-teal focus:border-transparent outline-none" />
+                </div>
+                <select @bind="selectedCategory" @bind:after="FilterProducts"
+                    class="border border-gray-200 rounded-lg px-4 py-2 text-gray-700 bg-gray-50 focus:ring-2 focus:ring-classic-teal outline-none">
+                    <option value="">All Categories</option>
+                    <option value="TShirt">TShirt</option>
+                    <option value="Dress">Dress</option>
+                    <option value="Jacket">Jacket</option>
+                    <option value="Sweater">Sweater</option>
+                </select>
+            </div>
+
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Product
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">SKU</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Stock</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Stock Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Price</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    @if (filteredProducts != null && filteredProducts.Any())
+                    {
+                        @foreach (var product in filteredProducts)
+                        {
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        @if (!string.IsNullOrEmpty(product.ImageUrl))
+                                        {
+                                            <img src="@product.ImageUrl" alt="@product.Name" 
+                                                class="h-10 w-10 flex-shrink-0 rounded-lg object-cover" />
+                                        }
+                                        else
+                                        {
+                                            <div
+                                                class="h-10 w-10 flex-shrink-0 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                            </div>
+                                        }
+                                        <div class="ml-4">
+                                            <div class="text-sm font-medium text-gray-900">@product.Name</div>
+                                            <div class="text-xs text-gray-500">@product.Category</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@product.SKU</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="text-sm font-medium text-gray-900">@product.StockQuantity</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if (product.StockQuantity > 10)
+                                    {
+                                        <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">In Stock</span>
+                                    }
+                                    else if (product.StockQuantity > 0)
+                                    {
+                                        <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">Low Stock</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Out of Stock</span>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">@($"₱{product.Price:N2}")</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if (product.IsActive)
+                                    {
+                                        <span
+                                            class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            Active
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span
+                                            class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                            Archived
+                                        </span>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button 
+                                            @onclick="() => EditProduct(product.Id)" 
+                                            class="text-classic-teal hover:text-teal-700 transition-colors" 
+                                            title="Edit">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            @onclick="() => ArchiveProduct(product)" 
+                                            class="text-yellow-600 hover:text-yellow-900 transition-colors" 
+                                            title="Archive">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                    d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                                No products found.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Product>? products = new();
+    private List<Product>? filteredProducts = new();
+    private bool isLoading = true;
+    private string searchTerm = string.Empty;
+    private string selectedCategory = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        isLoading = true;
+        try
+        {
+            products = await ApiClient.GetProductsAsync();
+            filteredProducts = products?.ToList() ?? new List<Product>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading products: {ex.Message}");
+            filteredProducts = new List<Product>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void FilterProducts()
+    {
+        if (products == null)
+        {
+            filteredProducts = new List<Product>();
+            return;
+        }
+
+        var filtered = products.AsEnumerable();
+
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var searchLower = searchTerm.ToLowerInvariant();
+            filtered = filtered.Where(p =>
+                (p.Name?.ToLowerInvariant().Contains(searchLower) ?? false) ||
+                (p.SKU?.ToLowerInvariant().Contains(searchLower) ?? false) ||
+                (p.Category?.ToLowerInvariant().Contains(searchLower) ?? false)
+            );
+        }
+
+        // Apply category filter
+        if (!string.IsNullOrWhiteSpace(selectedCategory))
+        {
+            filtered = filtered.Where(p => p.Category == selectedCategory);
+        }
+
+        filteredProducts = filtered.ToList();
+    }
+
+    private void EditProduct(int productId)
+    {
+        NavigationManager.NavigateTo($"/admin/products/edit/{productId}");
+    }
+
+    private async Task ArchiveProduct(Product product)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+            $"Are you sure you want to archive '{product.Name}'?");
+        
+        if (!confirmed)
+            return;
+
+        try
+        {
+            var request = new UpdateProductRequest
+            {
+                Name = product.Name,
+                Description = product.Description,
+                Category = product.Category,
+                Price = product.Price,
+                StockQuantity = product.StockQuantity,
+                ImageUrl = product.ImageUrl,
+                IsActive = false
+            };
+
+            var result = await ApiClient.UpdateProductAsync(product.Id, request);
+            if (result.Product != null)
+            {
+                await LoadProducts();
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", $"Failed to archive product: {result.Error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error archiving product: {ex.Message}");
+        }
+    }
+}

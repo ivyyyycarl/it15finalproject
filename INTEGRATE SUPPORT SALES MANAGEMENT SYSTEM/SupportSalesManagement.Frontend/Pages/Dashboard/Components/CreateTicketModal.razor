@@ -1,0 +1,217 @@
+@* Create Ticket Modal Component *@
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+
+@if (IsVisible)
+{
+    <div class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+                <h2 class="text-2xl font-bold text-gray-900">Create Support Ticket</h2>
+                <button @onclick="Close" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="px-6 py-6 space-y-5">
+                @if (SelectedCustomer != null)
+                {
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                <span
+                                    class="text-white font-semibold">@SelectedCustomer.FirstName[0]@SelectedCustomer.LastName[0]</span>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-900">@SelectedCustomer.FirstName @SelectedCustomer.LastName</p>
+                                <p class="text-sm text-gray-600">@SelectedCustomer.Email</p>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Subject -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Subject</label>
+                    <input type="text" @bind="ticketSubject" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Brief description of the issue" />
+                </div>
+
+                <!-- Category -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Category</label>
+                    <select @bind="ticketCategory"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Select a category</option>
+                        <option value="Product Issue">Product Issue</option>
+                        <option value="Billing">Billing</option>
+                        <option value="Returns">Returns & Exchanges</option>
+                        <option value="Sizing">Sizing Question</option>
+                        <option value="Shipping">Shipping & Delivery</option>
+                        <option value="General">General Inquiry</option>
+                    </select>
+                </div>
+
+                <!-- Priority -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Priority</label>
+                    <div class="grid grid-cols-4 gap-3">
+                        <button type="button" @onclick='() => ticketPriority = "Low"'
+                            class="@(ticketPriority == "Low" ? "bg-green-100 border-green-500 text-green-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md">
+                            Low
+                        </button>
+                        <button type="button" @onclick='() => ticketPriority = "Medium"'
+                            class="@(ticketPriority == "Medium" ? "bg-yellow-100 border-yellow-500 text-yellow-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md">
+                            Medium
+                        </button>
+                        <button type="button" @onclick='() => ticketPriority = "High"'
+                            class="@(ticketPriority == "High" ? "bg-orange-100 border-orange-500 text-orange-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md">
+                            High
+                        </button>
+                        <button type="button" @onclick='() => ticketPriority = "Urgent"'
+                            class="@(ticketPriority == "Urgent" ? "bg-red-100 border-red-500 text-red-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md">
+                            Urgent
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                    <textarea @bind="ticketDescription" rows="6" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        placeholder="Provide detailed information about the issue..."></textarea>
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded">
+                        @errorMessage
+                    </div>
+                }
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3 sticky bottom-0">
+                <button @onclick="Close"
+                    class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors">
+                    Cancel
+                </button>
+                <button @onclick="CreateTicket" disabled="@isSubmitting"
+                    class="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                    @if (isSubmitting)
+                    {
+                        <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        <span>Creating...</span>
+                    }
+                    else
+                    {
+                        <span>Create Ticket</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public Customer? SelectedCustomer { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<Ticket> OnTicketCreated { get; set; }
+
+    private string ticketSubject = "";
+    private string ticketCategory = "";
+    private string ticketPriority = "Medium";
+    private string ticketDescription = "";
+    private string errorMessage = "";
+    private bool isSubmitting = false;
+
+    private async Task CreateTicket()
+    {
+        errorMessage = "";
+
+        // Validation
+        if (SelectedCustomer == null)
+        {
+            errorMessage = "Please select a customer first.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ticketSubject))
+        {
+            errorMessage = "Please enter a subject.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ticketCategory))
+        {
+            errorMessage = "Please select a category.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ticketDescription))
+        {
+            errorMessage = "Please enter a description.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        try
+        {
+            var request = new CreateTicketRequest
+                {
+                    Title = ticketSubject,
+                    Description = ticketDescription,
+                    CustomerId = SelectedCustomer.Id,
+                    Priority = ticketPriority,
+                    Category = ticketCategory
+                };
+
+            var newTicket = await ApiClient.CreateTicketAsync(request);
+            if (newTicket == null)
+                throw new Exception("Failed to create ticket. Please try again.");
+
+            await OnTicketCreated.InvokeAsync(newTicket);
+            ResetForm();
+            await Close();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating ticket: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        ResetForm();
+        await OnClose.InvokeAsync();
+    }
+
+    private void ResetForm()
+    {
+        ticketSubject = "";
+        ticketCategory = "";
+        ticketPriority = "Medium";
+        ticketDescription = "";
+        errorMessage = "";
+    }
+}
+

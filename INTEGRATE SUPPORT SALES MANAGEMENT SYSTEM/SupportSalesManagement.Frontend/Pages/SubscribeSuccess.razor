@@ -1,0 +1,116 @@
+@page "/subscribe/success"
+@attribute [AllowAnonymous]
+@layout LandingLayout
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Subscription Success</PageTitle>
+
+<div class="min-h-screen bg-gradient-to-br from-[#f7fafc] via-[#eef4f8] to-[#fff8dc] p-6">
+    <div class="max-w-2xl mx-auto">
+        <div class="bg-white/90 backdrop-blur-sm border border-[#d7e6ef] rounded-2xl shadow-sm p-6">
+            @if (isLoading)
+            {
+                <div class="flex flex-col items-center justify-center py-10">
+                    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-[#4682B4]"></div>
+                    <p class="text-sm text-[#5F9EA0] mt-4">Verifying your payment and activating subscription...</p>
+                </div>
+            }
+            else
+            {
+                <div class="text-center">
+                    <div class="mx-auto w-16 h-16 rounded-full flex items-center justify-center @(isSuccess ? "bg-[#e8f5ec] text-[#2f8f77]" : "bg-red-100 text-red-700")">
+                        @if (isSuccess)
+                        {
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                        }
+                        else
+                        {
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        }
+                    </div>
+                    <h1 class="text-2xl font-bold text-[#1B3A4B] mt-4">@(isSuccess ? "Subscription Activated" : "Activation Failed")</h1>
+                    <p class="text-sm text-gray-600 mt-2">@statusMessage</p>
+
+                    @if (isSuccess && response != null)
+                    {
+                        <div class="mt-5 text-left bg-gradient-to-r from-[#eef4f8] to-[#fff8dc] border border-[#d7e6ef] rounded-xl p-4 text-sm text-gray-700 space-y-1">
+                            <p><span class="font-semibold text-[#1B3A4B]">Company:</span> @response.TenantName</p>
+                            <p><span class="font-semibold text-[#1B3A4B]">Plan:</span> @response.PlanName</p>
+                            <p><span class="font-semibold text-[#1B3A4B]">Admin User ID:</span> @response.AdminUserId</p>
+                        </div>
+                    }
+
+                    <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+                        <button type="button" class="px-4 py-2 rounded-lg bg-gradient-to-r from-[#4682B4] to-[#5F9EA0] text-white text-sm font-semibold hover:opacity-95"
+                                @onclick='() => NavigationManager.NavigateTo("/login")'>
+                            Go to Login
+                        </button>
+                        <button type="button" class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                                @onclick='() => NavigationManager.NavigateTo("/subscribe")'>
+                            Back to Subscribe
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "session_id")]
+    public string? SessionId { get; set; }
+    [SupplyParameterFromQuery(Name = "mock")]
+    public string? Mock { get; set; }
+    [SupplyParameterFromQuery(Name = "tenantName")]
+    public string? MockTenantName { get; set; }
+    [SupplyParameterFromQuery(Name = "planName")]
+    public string? MockPlanName { get; set; }
+    [SupplyParameterFromQuery(Name = "adminUserId")]
+    public int? MockAdminUserId { get; set; }
+    [SupplyParameterFromQuery(Name = "tenantSubscriptionId")]
+    public int? MockTenantSubscriptionId { get; set; }
+
+    private bool isLoading = true;
+    private bool isSuccess;
+    private string statusMessage = "Finalizing your company account...";
+    private CompanySubscriptionResponse? response;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.Equals(Mock, "1", StringComparison.OrdinalIgnoreCase))
+        {
+            isSuccess = true;
+            response = new CompanySubscriptionResponse
+            {
+                TenantName = MockTenantName ?? "Company",
+                PlanName = MockPlanName ?? "Plan",
+                AdminUserId = MockAdminUserId ?? 0,
+                TenantSubscriptionId = MockTenantSubscriptionId ?? 0
+            };
+            statusMessage = "Subscription activated in development mode.";
+            isLoading = false;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SessionId))
+        {
+            isSuccess = false;
+            statusMessage = "Missing Stripe session reference.";
+            isLoading = false;
+            return;
+        }
+
+        var (result, error) = await ApiClient.ConfirmSubscriptionCheckoutAsync(SessionId);
+        response = result;
+        isSuccess = result != null;
+        statusMessage = isSuccess
+            ? (result?.Message ?? "Your company is now subscribed.")
+            : (string.IsNullOrWhiteSpace(error) ? "Could not activate subscription from this payment session." : error);
+        isLoading = false;
+    }
+}

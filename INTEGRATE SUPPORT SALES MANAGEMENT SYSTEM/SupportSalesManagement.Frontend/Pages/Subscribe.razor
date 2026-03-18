@@ -1,0 +1,316 @@
+@page "/subscribe"
+@attribute [AllowAnonymous]
+@layout LandingLayout
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@using SupportSalesManagement.Frontend.Models
+
+<PageTitle>Subscribe Your Company - ClassicFit</PageTitle>
+
+<div class="min-h-screen bg-gradient-to-br from-[#f7fafc] via-[#eef4f8] to-[#fff8dc] p-6">
+    <div class="max-w-6xl mx-auto space-y-6">
+        <div class="text-center space-y-2">
+            <div class="inline-flex items-center rounded-full border border-[#d7e6ef] bg-white px-3 py-1 text-[11px] font-semibold text-[#4682B4]">
+                New Subscription Experience
+            </div>
+            <h1 class="text-3xl font-extrabold text-[#1B3A4B]">Plans and Pricing</h1>
+            <p class="text-sm text-[#5F9EA0]">Choose the right ClassicFit workspace plan and onboard your company in minutes.</p>
+
+            <div class="inline-flex items-center rounded-full bg-white border border-[#d7e6ef] p-1 shadow-sm mt-3">
+                <button type="button"
+                        @onclick='() => subscriptionRequest.BillingCycle = BillingCycle.Monthly'
+                        class="px-4 py-1.5 rounded-full text-xs font-semibold transition-colors @(subscriptionRequest.BillingCycle == BillingCycle.Monthly ? "bg-gradient-to-r from-[#4682B4] to-[#5F9EA0] text-white" : "text-gray-600 hover:text-[#1B3A4B]")">
+                    Pay Monthly
+                </button>
+                <button type="button"
+                        @onclick='() => subscriptionRequest.BillingCycle = BillingCycle.Annual'
+                        class="px-4 py-1.5 rounded-full text-xs font-semibold transition-colors @(subscriptionRequest.BillingCycle == BillingCycle.Annual ? "bg-gradient-to-r from-[#4682B4] to-[#5F9EA0] text-white" : "text-gray-600 hover:text-[#1B3A4B]")">
+                    Pay Yearly
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(statusMessage))
+        {
+            <div class="rounded-lg border px-4 py-3 text-sm @(statusSuccess ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700")">
+                @statusMessage
+            </div>
+        }
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div class="xl:col-span-2 bg-white/80 backdrop-blur-sm rounded-2xl border border-[#d7e6ef] shadow-sm p-5">
+                <h2 class="text-base font-bold text-[#1B3A4B] mb-3">Available Plans</h2>
+                @if (isLoadingPlans)
+                {
+                    <div class="py-10 flex justify-center">
+                        <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-blue-600"></div>
+                    </div>
+                }
+                else if (!plans.Any())
+                {
+                    <p class="text-sm text-gray-500">No active plans available.</p>
+                }
+                else
+                {
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        @foreach (var plan in plans)
+                        {
+                            var selected = subscriptionRequest.SubscriptionPlanId == plan.Id;
+                            var recommended = IsRecommendedPlan(plan);
+                            <button type="button" @onclick="() => SelectPlan(plan.Id)"
+                                    class="text-left rounded-2xl border p-4 transition-all relative overflow-hidden @(selected ? "border-[#4682B4] bg-gradient-to-br from-[#e9f3f8] to-white shadow-md" : "border-gray-200 bg-white hover:border-[#80A1BA]")">
+                                @if (recommended)
+                                {
+                                    <span class="absolute top-3 right-3 inline-flex text-[10px] font-bold px-2 py-1 rounded-full bg-[#FFF8DC] text-[#1B3A4B] border border-[#f1e8c3]">
+                                        Most Popular
+                                    </span>
+                                }
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="font-bold text-[#1B3A4B]">@plan.Name</p>
+                                        <p class="text-xs text-[#5F9EA0]">@plan.Code</p>
+                                    </div>
+                                    <span class="text-xs font-semibold px-2 py-1 rounded-full @(selected ? "bg-[#d9ebf6] text-[#1E3A5F]" : "bg-gray-100 text-gray-700")">
+                                        @(selected ? "Selected" : "Pick")
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-600 mt-2 min-h-[40px]">@(string.IsNullOrWhiteSpace(plan.Description) ? "Business-ready subscription plan." : plan.Description)</p>
+                                <div class="mt-3">
+                                    <p class="text-3xl font-extrabold text-[#1B3A4B]">
+                                        ₱@GetDisplayedPrice(plan).ToString("N0")
+                                        <span class="text-xs font-medium text-gray-500">/@(subscriptionRequest.BillingCycle == BillingCycle.Monthly ? "month" : "year")</span>
+                                    </p>
+                                    <p class="text-xs text-[#5F9EA0] mt-1">
+                                        Monthly ₱@plan.MonthlyPrice.ToString("N0") · Yearly ₱@plan.AnnualPrice.ToString("N0")
+                                    </p>
+                                </div>
+                                <div class="mt-3 text-xs text-gray-700 space-y-1">
+                                    <p>• @(plan.MaxUsers <= 0 ? "Unlimited users" : $"Up to {plan.MaxUsers} users")</p>
+                                    <p>• @(plan.MaxBranches <= 0 ? "Unlimited branches" : $"Up to {plan.MaxBranches} branches")</p>
+                                    <p>• @BuildFeatureTagline(plan)</p>
+                                </div>
+                                <div class="mt-4 rounded-lg bg-gradient-to-r from-[#4682B4] to-[#5F9EA0] text-white text-xs font-semibold text-center py-2">
+                                    @(selected ? "Plan Selected" : "Select Plan")
+                                </div>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="bg-white/90 backdrop-blur-sm rounded-2xl border border-[#d7e6ef] shadow-sm p-4 space-y-3">
+                <h2 class="text-base font-bold text-[#1B3A4B]">Create Company Account</h2>
+
+                <input @bind="subscriptionRequest.CompanyName" type="text" placeholder="Company name"
+                       class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input @bind="subscriptionRequest.AdminFirstName" type="text" placeholder="Admin first name"
+                           class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                    <input @bind="subscriptionRequest.AdminLastName" type="text" placeholder="Admin last name"
+                           class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+
+                <input @bind="subscriptionRequest.AdminEmail" type="email" placeholder="Admin email"
+                       class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                <div class="relative">
+                    <input @bind="subscriptionRequest.AdminPassword"
+                           type="@(showPassword ? "text" : "password")"
+                           placeholder="Admin password"
+                           class="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg text-sm" />
+                    <button type="button"
+                            @onclick="TogglePasswordVisibility"
+                            class="absolute inset-y-0 right-2 my-auto h-7 w-7 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center"
+                            title="@(showPassword ? "Hide password" : "Show password")"
+                            aria-label="@(showPassword ? "Hide password" : "Show password")">
+                        @if (showPassword)
+                        {
+                            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.58 10.59A2 2 0 0013.41 13.4M9.88 5.09A9.77 9.77 0 0112 4c5 0 9.27 3.11 11 8-1.01 2.86-2.92 4.98-5.35 6.16M6.7 6.72C4.53 8 2.84 9.84 2 12c1.73 4.89 6 8 10 8 1.51 0 2.96-.38 4.27-1.06" />
+                            </svg>
+                        }
+                        else
+                        {
+                            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-8 10-8 10 8 10 8-3.5 8-10 8-10-8-10-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                        }
+                    </button>
+                </div>
+                <p class="text-[11px] text-gray-500">
+                    Password must be at least 8 characters and include uppercase, lowercase, number, and special character.
+                </p>
+                <input @bind="subscriptionRequest.ContactPhone" type="text" placeholder="Contact phone (optional)"
+                       class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                <input @bind="subscriptionRequest.InitialBranchName" type="text" placeholder="Initial branch name (optional)"
+                       class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+
+                <select @bind="subscriptionRequest.BillingCycle" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                    <option value="@BillingCycle.Monthly">Monthly Billing</option>
+                    <option value="@BillingCycle.Annual">Annual Billing</option>
+                </select>
+
+                @if (SelectedPlan != null)
+                {
+                    <div class="rounded-lg border border-[#d7e6ef] bg-gradient-to-r from-[#f1f7fb] to-[#fff8dc] p-3 text-xs text-gray-700 space-y-1">
+                        <p><span class="font-semibold text-[#1B3A4B]">Selected Plan:</span> @SelectedPlan.Name (@SelectedPlan.Code)</p>
+                        <p><span class="font-semibold text-[#1B3A4B]">Price:</span> ₱@GetDisplayedPrice(SelectedPlan).ToString("N2") per @(subscriptionRequest.BillingCycle == BillingCycle.Monthly ? "month" : "year")</p>
+                        <p><span class="font-semibold text-[#1B3A4B]">Coverage:</span> @(SelectedPlan.MaxUsers <= 0 ? "Unlimited users" : $"{SelectedPlan.MaxUsers} users"), @(SelectedPlan.MaxBranches <= 0 ? "Unlimited branches" : $"{SelectedPlan.MaxBranches} branches")</p>
+                    </div>
+                }
+
+                <button type="button" @onclick="SubmitSubscription" disabled="@isSubmitting"
+                        class="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-[#4682B4] to-[#5F9EA0] text-white text-sm font-semibold hover:opacity-95 disabled:opacity-60">
+                    @(isSubmitting ? "Redirecting to Stripe..." : "Proceed to Stripe Checkout")
+                </button>
+                <button type="button" @onclick='() => NavigationManager.NavigateTo("/login")'
+                        class="w-full px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                    Go to Login
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<SubscriptionPlanModel> plans = new();
+    private bool isLoadingPlans = true;
+    private bool isSubmitting;
+    private bool showPassword;
+    private string? statusMessage;
+    private bool statusSuccess;
+    [SupplyParameterFromQuery(Name = "canceled")]
+    public string? Canceled { get; set; }
+
+    private CompanySubscriptionRequest subscriptionRequest = new()
+    {
+        BillingCycle = BillingCycle.Monthly
+    };
+
+    private SubscriptionPlanModel? SelectedPlan =>
+        plans.FirstOrDefault(p => p.Id == subscriptionRequest.SubscriptionPlanId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        plans = await ApiClient.GetPublicSubscriptionPlansAsync() ?? new();
+        subscriptionRequest.SubscriptionPlanId = plans.FirstOrDefault()?.Id ?? 0;
+        isLoadingPlans = false;
+
+        if (!string.IsNullOrWhiteSpace(Canceled) &&
+            string.Equals(Canceled, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            statusSuccess = false;
+            statusMessage = "Stripe checkout was canceled. You can try again anytime.";
+        }
+    }
+
+    private void SelectPlan(int planId)
+    {
+        subscriptionRequest.SubscriptionPlanId = planId;
+    }
+
+    private decimal GetDisplayedPrice(SubscriptionPlanModel plan)
+    {
+        return subscriptionRequest.BillingCycle == BillingCycle.Annual
+            ? plan.AnnualPrice
+            : plan.MonthlyPrice;
+    }
+
+    private bool IsRecommendedPlan(SubscriptionPlanModel plan)
+    {
+        if (plans.Count < 3)
+        {
+            return false;
+        }
+
+        var ordered = plans.OrderBy(p => p.MonthlyPrice).ToList();
+        var middle = ordered[ordered.Count / 2];
+        return middle.Id == plan.Id;
+    }
+
+    private static string BuildFeatureTagline(SubscriptionPlanModel plan)
+    {
+        if (!string.IsNullOrWhiteSpace(plan.Code))
+        {
+            var code = plan.Code.Trim().ToUpperInvariant();
+            if (code == "BASIC")
+            {
+                return "Standard ERP sync";
+            }
+
+            if (code == "STANDARD")
+            {
+                return "Advanced ERP sync + multi-branch";
+            }
+
+            if (code == "ENTERPRISE")
+            {
+                return "Full ERP integration + analytics";
+            }
+        }
+
+        return "Business operations ready";
+    }
+
+    private async Task SubmitSubscription()
+    {
+        if (string.IsNullOrWhiteSpace(subscriptionRequest.CompanyName) ||
+            string.IsNullOrWhiteSpace(subscriptionRequest.AdminFirstName) ||
+            string.IsNullOrWhiteSpace(subscriptionRequest.AdminLastName) ||
+            string.IsNullOrWhiteSpace(subscriptionRequest.AdminEmail) ||
+            string.IsNullOrWhiteSpace(subscriptionRequest.AdminPassword))
+        {
+            statusSuccess = false;
+            statusMessage = "Please complete all required company and admin fields.";
+            return;
+        }
+
+        if (!IsStrongPassword(subscriptionRequest.AdminPassword))
+        {
+            statusSuccess = false;
+            statusMessage = "Password must be 8+ chars with uppercase, lowercase, number, and special character.";
+            return;
+        }
+
+        if (subscriptionRequest.SubscriptionPlanId <= 0)
+        {
+            statusSuccess = false;
+            statusMessage = "Please select a subscription plan.";
+            return;
+        }
+
+        isSubmitting = true;
+        statusMessage = null;
+        var (checkoutUrl, error) = await ApiClient.CreateSubscriptionCheckoutSessionAsync(subscriptionRequest);
+        isSubmitting = false;
+
+        if (!string.IsNullOrWhiteSpace(checkoutUrl))
+        {
+            NavigationManager.NavigateTo(checkoutUrl, forceLoad: true);
+            return;
+        }
+
+        statusSuccess = false;
+        statusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to create Stripe checkout session." : error;
+    }
+
+    private static bool IsStrongPassword(string password)
+    {
+        if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+        {
+            return false;
+        }
+
+        var hasUpper = password.Any(char.IsUpper);
+        var hasLower = password.Any(char.IsLower);
+        var hasDigit = password.Any(char.IsDigit);
+        var hasSpecial = password.Any(ch => !char.IsLetterOrDigit(ch));
+        return hasUpper && hasLower && hasDigit && hasSpecial;
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        showPassword = !showPassword;
+    }
+}

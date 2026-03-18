@@ -1,0 +1,10 @@
+@page "/superadmin/tickets/escalations"
+@layout SuperAdminLayout
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.NavigateTo("/superadmin/tickets/all", replace: true);
+    }
+}

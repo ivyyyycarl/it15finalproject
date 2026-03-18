@@ -1,0 +1,576 @@
+@page "/dashboard/erp"
+@layout ERPMainLayout
+@using SupportSalesManagement.Frontend.Services
+@using SupportSalesManagement.Frontend.Models
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>ERP Dashboard - SupportFlow</PageTitle>
+
+<!-- Page Header -->
+<div class="erp-page-header">
+    <div class="erp-page-title-row">
+        <div>
+            <h1 class="erp-page-title">ERP Dashboard</h1>
+            <p class="erp-page-subtitle">Real-time overview of shirt orders, customer interactions & support metrics</p>
+        </div>
+        <div class="erp-page-actions">
+            <button class="modern-btn modern-btn-secondary">
+                <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export Report
+            </button>
+            <button class="modern-btn modern-btn-primary">
+                <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                New Order
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Real-Time Metrics Grid -->
+<div class="erp-stats-grid">
+    <!-- Shirt Orders Today -->
+    <div class="erp-stat-card success">
+        <div class="erp-stat-header">
+            <div class="erp-stat-icon-container"
+                style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));">
+                <svg class="erp-stat-icon" style="color: var(--erp-success);" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+            </div>
+        </div>
+        <div class="erp-stat-body">
+            <div class="erp-stat-label">Shirt Orders Today</div>
+            <div class="erp-stat-value">@todayOrders</div>
+        </div>
+        <div class="erp-stat-footer">
+            <span class="erp-stat-detail">@allOrders.Count total</span>
+            <a href="/orders" class="erp-stat-link">View All →</a>
+        </div>
+    </div>
+
+    <!-- Active Support Tickets -->
+    <div class="erp-stat-card danger">
+        <div class="erp-stat-header">
+            <div class="erp-stat-icon-container"
+                style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));">
+                <svg class="erp-stat-icon" style="color: var(--erp-danger);" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </div>
+        </div>
+        <div class="erp-stat-body">
+            <div class="erp-stat-label">Active Support Tickets</div>
+            <div class="erp-stat-value">@openTickets</div>
+        </div>
+        <div class="erp-stat-footer">
+            <span class="erp-stat-detail">@allTickets.Count(t => t.Priority == "High" || t.Priority == "Urgent") high priority</span>
+            <a href="/tickets" class="erp-stat-link">Manage →</a>
+        </div>
+    </div>
+
+    <!-- Avg Order Value -->
+    <div class="erp-stat-card warning">
+        <div class="erp-stat-header">
+            <div class="erp-stat-icon-container"
+                style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05));">
+                <svg class="erp-stat-icon" style="color: var(--erp-warning);" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+            </div>
+        </div>
+        <div class="erp-stat-body">
+            <div class="erp-stat-label">Avg Order Value</div>
+            <div class="erp-stat-value">@(todayOrders > 0 ? FormatCurrency(todayRevenue / todayOrders) : "₱0")</div>
+        </div>
+        <div class="erp-stat-footer">
+            <span class="erp-stat-detail">@todayOrders orders today</span>
+            <a href="/admin/reports/sales" class="erp-stat-link">Details →</a>
+        </div>
+    </div>
+
+    <!-- Resolution Rate -->
+    <div class="erp-stat-card">
+        <div class="erp-stat-header">
+            <div class="erp-stat-icon-container">
+                <svg class="erp-stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+        </div>
+        <div class="erp-stat-body">
+            <div class="erp-stat-label">Resolution Rate</div>
+            <div class="erp-stat-value">@(GetResolutionRate())%</div>
+        </div>
+        <div class="erp-stat-footer">
+            <span class="erp-stat-detail">@resolvedTickets resolved</span>
+            <a href="/reports" class="erp-stat-link">Report →</a>
+        </div>
+    </div>
+
+    <!-- Revenue Today -->
+    <div class="erp-stat-card success">
+        <div class="erp-stat-header">
+            <div class="erp-stat-icon-container"
+                style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));">
+                <svg class="erp-stat-icon" style="color: var(--erp-success);" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+        </div>
+        <div class="erp-stat-body">
+            <div class="erp-stat-label">Revenue Today</div>
+            <div class="erp-stat-value">@FormatCurrency(todayRevenue)</div>
+        </div>
+        <div class="erp-stat-footer">
+            <span class="erp-stat-detail">@todayOrders orders</span>
+            <a href="/analytics" class="erp-stat-link">Analytics →</a>
+        </div>
+    </div>
+
+    <!-- Order Completion Rate -->
+    <div class="erp-stat-card">
+        <div class="erp-stat-header">
+            <div class="erp-stat-icon-container">
+                <svg class="erp-stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+            </div>
+        </div>
+        <div class="erp-stat-body">
+            <div class="erp-stat-label">Order Completion</div>
+            <div class="erp-stat-value">@(GetOrderCompletionRate())%</div>
+        </div>
+        <div class="erp-stat-footer">
+            <span class="erp-stat-detail">@completedOrders completed</span>
+            <a href="/admin/reports/sales" class="erp-stat-link">Details →</a>
+        </div>
+    </div>
+
+    <!-- Customer Satisfaction -->
+    <div class="erp-stat-card success">
+        <div class="erp-stat-header">
+            <div class="erp-stat-icon-container"
+                style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));">
+                <svg class="erp-stat-icon" style="color: var(--erp-success);" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+        </div>
+        <div class="erp-stat-body">
+            <div class="erp-stat-label">Total Customers</div>
+            <div class="erp-stat-value">@totalCustomers</div>
+        </div>
+        <div class="erp-stat-footer">
+            <span class="erp-stat-detail">registered customers</span>
+            <a href="/feedback" class="erp-stat-link">Feedback →</a>
+        </div>
+    </div>
+
+    <!-- Pending Returns -->
+    <div class="erp-stat-card warning">
+        <div class="erp-stat-header">
+            <div class="erp-stat-icon-container"
+                style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05));">
+                <svg class="erp-stat-icon" style="color: var(--erp-warning);" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+            </div>
+        </div>
+        <div class="erp-stat-body">
+            <div class="erp-stat-label">Pending Returns</div>
+            <div class="erp-stat-value">@pendingReturns</div>
+        </div>
+        <div class="erp-stat-footer">
+            <span class="erp-stat-detail">return requests</span>
+            <a href="/returns" class="erp-stat-link">Process →</a>
+        </div>
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <div class="erp-data-card">
+        <div class="erp-data-card-header">
+            <h3 class="erp-data-card-title">7-Day Revenue Trend</h3>
+        </div>
+        <div class="erp-data-card-body">
+            <ApexChart TItem="SimplePoint" Height="280">
+                <ApexPointSeries TItem="SimplePoint"
+                                 Items="revenueTrendData"
+                                 Name="Revenue"
+                                 SeriesType="SeriesType.Area"
+                                 XValue="@(p => p.Label)"
+                                 YValue="@(p => p.Value)"
+                                 Color="#10B981" />
+            </ApexChart>
+        </div>
+    </div>
+
+    <div class="erp-data-card">
+        <div class="erp-data-card-header">
+            <h3 class="erp-data-card-title">Ticket Status Distribution</h3>
+        </div>
+        <div class="erp-data-card-body">
+            <ApexChart TItem="SimplePoint" Height="280">
+                <ApexPointSeries TItem="SimplePoint"
+                                 Items="ticketStatusData"
+                                 Name="Tickets"
+                                 SeriesType="SeriesType.Bar"
+                                 XValue="@(p => p.Label)"
+                                 YValue="@(p => p.Value)"
+                                 Color="#6366F1" />
+            </ApexChart>
+        </div>
+    </div>
+</div>
+
+<!-- Data Grid -->
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Recent Customer Interactions -->
+    <div class="erp-data-card">
+        <div class="erp-data-card-header">
+            <h3 class="erp-data-card-title">Recent Customer Interactions</h3>
+            <a href="/customer-interactions" class="erp-stat-link">View All →</a>
+        </div>
+        <div class="erp-data-card-body">
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th>Customer</th>
+                        <th>Category</th>
+                        <th>Subject</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (recentTickets.Any())
+                    {
+                        @foreach (var ticket in pagedRecentTickets)
+                        {
+                            <tr>
+                                <td>
+                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <div
+                                            style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.75rem;">
+                                            @GetInitials(ticket.CustomerName)</div>
+                                        <div>
+                                            <div style="font-weight: 600; font-size: 0.875rem;">@ticket.CustomerName</div>
+                                            <div style="font-size: 0.75rem; color: var(--erp-gray-500);">@ticket.TicketNumber</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="modern-badge modern-badge-primary">@ticket.Category</span></td>
+                                <td>@(string.IsNullOrEmpty(ticket.Subject) ? ticket.Title : ticket.Subject)</td>
+                                <td><span class="modern-badge @GetStatusBadgeClass(ticket.Status)">@ticket.Status</span></td>
+                                <td style="font-family: var(--font-mono); font-size: 0.8125rem;">@TimeAgo(ticket.CreatedAt)</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 2rem; color: var(--erp-gray-500);">No recent interactions</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (recentTickets.Any())
+        {
+            <div style="margin-top: 0.75rem; display:flex; align-items:center; justify-content:space-between;">
+                <span style="font-size:0.8rem; color: var(--erp-gray-500);">Showing @(((ticketCurrentPage - 1) * tablePageSize) + 1)-@Math.Min(ticketCurrentPage * tablePageSize, recentTickets.Count) of @recentTickets.Count · Page @ticketCurrentPage/@ticketTotalPages</span>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <button type="button" @onclick="PreviousTicketPage" disabled="@(ticketCurrentPage <= 1)" class="modern-btn modern-btn-secondary">Previous</button>
+                    <button type="button" @onclick="NextTicketPage" disabled="@(ticketCurrentPage >= ticketTotalPages)" class="modern-btn modern-btn-secondary">Next</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="erp-data-card">
+        <div class="erp-data-card-header">
+            <h3 class="erp-data-card-title">Quick Actions</h3>
+        </div>
+        <div class="erp-data-card-body" style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <button class="modern-btn modern-btn-primary" style="width: 100%; justify-content: flex-start;">
+                <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Create New Ticket
+            </button>
+            <button class="modern-btn modern-btn-secondary" style="width: 100%; justify-content: flex-start;">
+                <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                Process Shirt Order
+            </button>
+            <button class="modern-btn modern-btn-secondary" style="width: 100%; justify-content: flex-start;">
+                <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Add New Customer
+            </button>
+            <button class="modern-btn modern-btn-secondary" style="width: 100%; justify-content: flex-start;">
+                <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Generate Report
+            </button>
+            <hr style="margin: 0.5rem 0;" />
+            <button class="modern-btn modern-btn-accent" style="width: 100%; justify-content: flex-start;">
+                <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                View All Notifications
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Orders -->
+<div class="erp-data-card">
+    <div class="erp-data-card-header">
+        <h3 class="erp-data-card-title">Recent Shirt Orders</h3>
+        <a href="/orders" class="erp-stat-link">View All Orders →</a>
+    </div>
+    <div class="erp-data-card-body">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Items</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (recentOrders.Any())
+                {
+                    @foreach (var order in pagedRecentOrders)
+                    {
+                        <tr>
+                            <td style="font-family: var(--font-mono); font-weight: 600;">@order.OrderNumber</td>
+                            <td>@order.CustomerName</td>
+                            <td>@order.ItemCount</td>
+                            <td style="font-family: var(--font-mono); font-weight: 600;">$@order.TotalAmount.ToString("N2")</td>
+                            <td><span class="modern-badge @GetStatusBadgeClass(order.Status)">@order.Status</span></td>
+                            <td style="font-family: var(--font-mono); font-size: 0.8125rem;">@order.OrderDate.ToString("yyyy-MM-dd")</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--erp-gray-500);">No recent orders</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (recentOrders.Any())
+    {
+        <div style="margin-top: 0.75rem; display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:0.8rem; color: var(--erp-gray-500);">Showing @(((orderCurrentPage - 1) * tablePageSize) + 1)-@Math.Min(orderCurrentPage * tablePageSize, recentOrders.Count) of @recentOrders.Count · Page @orderCurrentPage/@orderTotalPages</span>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+                <button type="button" @onclick="PreviousOrderPage" disabled="@(orderCurrentPage <= 1)" class="modern-btn modern-btn-secondary">Previous</button>
+                <button type="button" @onclick="NextOrderPage" disabled="@(orderCurrentPage >= orderTotalPages)" class="modern-btn modern-btn-secondary">Next</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private int todayOrders;
+    private decimal todayRevenue;
+    private int openTickets;
+    private int totalCustomers;
+    private int resolvedTickets;
+    private int totalTickets;
+    private int pendingReturns;
+    private int completedOrders;
+    private int allOrderCount;
+    private List<Order> allOrders = new();
+    private List<Ticket> allTickets = new();
+    private List<Order> recentOrders = new();
+    private List<Ticket> recentTickets = new();
+    private int ticketCurrentPage = 1;
+    private int orderCurrentPage = 1;
+    private const int tablePageSize = 5;
+    private int ticketTotalPages => Math.Max(1, (int)Math.Ceiling(recentTickets.Count / (double)tablePageSize));
+    private int orderTotalPages => Math.Max(1, (int)Math.Ceiling(recentOrders.Count / (double)tablePageSize));
+    private List<Ticket> pagedRecentTickets => recentTickets.Skip((ticketCurrentPage - 1) * tablePageSize).Take(tablePageSize).ToList();
+    private List<Order> pagedRecentOrders => recentOrders.Skip((orderCurrentPage - 1) * tablePageSize).Take(tablePageSize).ToList();
+    private List<SimplePoint> revenueTrendData = new();
+    private List<SimplePoint> ticketStatusData = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var ordersTask = ApiClient.GetOrdersAsync();
+            var ticketsTask = ApiClient.GetTicketsAsync();
+            var customersTask = ApiClient.GetCustomersAsync();
+
+            await Task.WhenAll(ordersTask, ticketsTask, customersTask);
+
+            var orders = ordersTask.Result ?? new List<Order>();
+            var tickets = ticketsTask.Result ?? new List<Ticket>();
+            var customers = customersTask.Result ?? new List<Customer>();
+            allOrders = orders;
+            allTickets = tickets;
+
+            todayOrders = orders.Count(o => o.OrderDate.Date == DateTime.Today);
+            todayRevenue = orders.Where(o => o.OrderDate.Date == DateTime.Today).Sum(o => o.TotalAmount);
+            openTickets = tickets.Count(t => t.Status != "Closed" && t.Status != "Resolved");
+            totalCustomers = customers.Count;
+            resolvedTickets = tickets.Count(t => t.Status == "Resolved" || t.Status == "Closed");
+            totalTickets = tickets.Count;
+            pendingReturns = orders.Count(o => o.Status == "Return Pending" || o.Status == "Return Requested");
+            completedOrders = orders.Count(o => o.Status == "Completed" || o.Status == "Delivered");
+            allOrderCount = orders.Count;
+            recentOrders = orders.OrderByDescending(o => o.OrderDate).ToList();
+            recentTickets = tickets.OrderByDescending(t => t.CreatedAt).ToList();
+            ticketCurrentPage = 1;
+            orderCurrentPage = 1;
+            BuildCharts();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+        }
+    }
+
+    private string FormatCurrency(decimal amount)
+    {
+        if (amount >= 1000)
+            return $"${(amount / 1000):N1}K";
+        return $"${amount:N2}";
+    }
+
+    private double GetResolutionRate()
+    {
+        if (totalTickets == 0) return 0;
+        return Math.Round((double)resolvedTickets / totalTickets * 100, 1);
+    }
+
+    private double GetOrderCompletionRate()
+    {
+        if (allOrderCount == 0) return 0;
+        return Math.Round((double)completedOrders / allOrderCount * 100, 1);
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return "??";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return name.Length >= 2 ? name[..2].ToUpper() : name.ToUpper();
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Shipped" or "Completed" or "Delivered" or "Resolved" or "Closed" => "modern-badge-success",
+            "Processing" or "Pending" or "In Progress" => "modern-badge-warning",
+            "Confirmed" or "Open" => "modern-badge-primary",
+            "Cancelled" or "Urgent" or "Escalated" => "modern-badge-danger",
+            _ => "modern-badge-neutral"
+        };
+    }
+
+    private string TimeAgo(DateTime date)
+    {
+        var span = DateTime.Now - date;
+        if (span.TotalMinutes < 1) return "just now";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
+        return $"{(int)span.TotalDays}d ago";
+    }
+
+    private void BuildCharts()
+    {
+        var days = Enumerable.Range(0, 7)
+            .Select(i => DateTime.Today.AddDays(-6 + i))
+            .ToList();
+
+        revenueTrendData = days
+            .Select(d => new SimplePoint
+            {
+                Label = d.ToString("ddd"),
+                Value = allOrders
+                    .Where(o => o.OrderDate.Date == d.Date || o.CreatedAt.Date == d.Date)
+                    .Sum(o => o.TotalAmount)
+            })
+            .ToList();
+
+        ticketStatusData = allTickets
+            .GroupBy(t => string.IsNullOrWhiteSpace(t.Status) ? "Unknown" : t.Status)
+            .Select(g => new SimplePoint
+            {
+                Label = g.Key,
+                Value = g.Count()
+            })
+            .OrderByDescending(p => p.Value)
+            .Take(6)
+            .ToList();
+    }
+
+    private void PreviousTicketPage()
+    {
+        if (ticketCurrentPage <= 1) return;
+        ticketCurrentPage--;
+    }
+
+    private void NextTicketPage()
+    {
+        if (ticketCurrentPage >= ticketTotalPages) return;
+        ticketCurrentPage++;
+    }
+
+    private void PreviousOrderPage()
+    {
+        if (orderCurrentPage <= 1) return;
+        orderCurrentPage--;
+    }
+
+    private void NextOrderPage()
+    {
+        if (orderCurrentPage >= orderTotalPages) return;
+        orderCurrentPage++;
+    }
+
+    public class SimplePoint
+    {
+        public string Label { get; set; } = string.Empty;
+        public decimal Value { get; set; }
+    }
+}

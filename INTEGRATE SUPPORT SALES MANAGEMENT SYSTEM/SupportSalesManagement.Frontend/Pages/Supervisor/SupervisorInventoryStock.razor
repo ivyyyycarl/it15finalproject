@@ -1,0 +1,504 @@
+@page "/supervisor/inventory/stock"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor,Admin,SuperAdmin")]
+@inject SupportSalesManagement.Frontend.Services.ApiClient ApiClient
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@implements IDisposable
+
+<div class="p-6 space-y-4" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-[22px] font-bold text-gray-900">Stock Levels</h1>
+                <p class="text-[12px] text-gray-500">View current inventory stock levels (Read-Only Access)</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button @onclick="ExportToPdf" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    Export to PDF
+                </button>
+                <div class="flex items-center gap-2 px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span class="text-xs font-medium text-yellow-800">Read-Only Access</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex justify-center items-center py-12">
+            <div class="text-gray-500">Loading products...</div>
+        </div>
+    }
+    else
+    {
+        <!-- Stock Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-blue-50 to-white p-5 rounded-xl border border-blue-100 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Total Products</p>
+                        <p class="text-2xl font-bold text-gray-900">@totalProducts</p>
+                    </div>
+                    <div class="p-3 bg-blue-100 rounded-full">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-emerald-50 to-white p-5 rounded-xl border border-emerald-100 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">In Stock</p>
+                        <p class="text-2xl font-bold text-green-600">@inStockCount</p>
+                    </div>
+                    <div class="p-3 bg-green-100 rounded-full">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-amber-50 to-white p-5 rounded-xl border border-amber-100 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Low Stock</p>
+                        <p class="text-2xl font-bold text-yellow-600">@lowStockCount</p>
+                    </div>
+                    <div class="p-3 bg-yellow-100 rounded-full">
+                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-rose-50 to-white p-5 rounded-xl border border-rose-100 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Out of Stock</p>
+                        <p class="text-2xl font-bold text-red-600">@outOfStockCount</p>
+                    </div>
+                    <div class="p-3 bg-red-100 rounded-full">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filter -->
+        <div class="bg-gradient-to-r from-white to-slate-50 p-5 rounded-xl border border-slate-200 shadow-sm mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="md:col-span-2">
+                    <input value="@searchInput" @oninput="OnSearchInput" type="text" placeholder="Search products by name or category..."
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                </div>
+                <div>
+                    <select @bind="selectedCategory" @bind:event="onchange" @bind:after="OnFilterChanged" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Categories</option>
+                        <option value="TShirt">TShirt</option>
+                        <option value="Dress">Dress</option>
+                        <option value="Jacket">Jacket</option>
+                        <option value="Sweater">Sweater</option>
+                    </select>
+                </div>
+                <div>
+                    <select @bind="stockFilter" @bind:event="onchange" @bind:after="OnFilterChanged" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All Stock Levels</option>
+                        <option value="in-stock">In Stock (>10)</option>
+                        <option value="low-stock">Low Stock (≤10)</option>
+                        <option value="out-of-stock">Out of Stock (=0)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Levels Table -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Level</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    @if (PagedProducts.Any())
+                    {
+                        @foreach (var product in PagedProducts)
+                        {
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">@product.SKU</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">@product.Name</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@product.Category</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">@($"₱{product.Price:N2}")</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">@product.StockQuantity</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if (product.StockQuantity == 0)
+                                    {
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                            Out of Stock
+                                        </span>
+                                    }
+                                    else if (product.StockQuantity <= 10)
+                                    {
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                            Low Stock
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            In Stock
+                                        </span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">No products found matching your filters.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            @if (TotalPages > 1)
+            {
+                <div class="bg-white px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <div class="text-sm text-gray-500">
+                        Showing <span class="font-semibold text-gray-900">@(((currentPage - 1) * pageSize) + 1)</span> to
+                        <span class="font-semibold text-gray-900">@Math.Min(currentPage * pageSize, filteredProducts.Count)</span> of
+                        <span class="font-semibold text-gray-900">@filteredProducts.Count</span> products
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button @onclick="() => GoToPage(1)" disabled="@(currentPage == 1)"
+                            class="px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors @(currentPage == 1 ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50")">
+                            First
+                        </button>
+                        <button @onclick="() => GoToPage(currentPage - 1)" disabled="@(currentPage == 1)"
+                            class="px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors @(currentPage == 1 ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50")">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+
+                        @foreach (var pageNum in GetPageNumbers())
+                        {
+                            <button @onclick="() => GoToPage(pageNum)"
+                                class="px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors @(pageNum == currentPage ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50")">
+                                @pageNum
+                            </button>
+                        }
+
+                        <button @onclick="() => GoToPage(currentPage + 1)" disabled="@(currentPage == TotalPages)"
+                            class="px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors @(currentPage == TotalPages ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50")">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                        <button @onclick="() => GoToPage(TotalPages)" disabled="@(currentPage == TotalPages)"
+                            class="px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors @(currentPage == TotalPages ? "bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50")">
+                            Last
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-gray-500">Rows per page:</span>
+                        <select @bind="pageSize" @bind:event="onchange" @bind:after="OnPageSizeChanged"
+                            class="px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? QuerySearch { get; set; }
+
+    [SupplyParameterFromQuery(Name = "category")]
+    public string? QueryCategory { get; set; }
+
+    [SupplyParameterFromQuery(Name = "stock")]
+    public string? QueryStock { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int? QueryPage { get; set; }
+
+    [SupplyParameterFromQuery(Name = "size")]
+    public int? QueryPageSize { get; set; }
+
+    private string searchQuery = "";
+    private string searchInput = "";
+    private string selectedCategory = "";
+    private string stockFilter = "all";
+    private bool isLoading = true;
+    private CancellationTokenSource? _searchDebounceCts;
+    
+    private List<Product> allProducts = new();
+    private List<Product> filteredProducts = new();
+    
+    private int totalProducts = 0;
+    private int inStockCount = 0;
+    private int lowStockCount = 0;
+    private int outOfStockCount = 0;
+
+    private int currentPage = 1;
+    private int pageSize = 10;
+
+    private int TotalPages => filteredProducts.Count > 0 ? (int)Math.Ceiling((double)filteredProducts.Count / pageSize) : 1;
+
+    private List<Product> PagedProducts => filteredProducts
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    protected override void OnParametersSet()
+    {
+        ApplyDeepLinkFilters();
+    }
+
+    private async Task LoadProducts()
+    {
+        isLoading = true;
+        try
+        {
+            var products = await ApiClient.GetProductsAsync();
+            if (products != null)
+            {
+                allProducts = products.Where(p => p.IsActive).ToList();
+                ApplyFilters();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading products: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplyFilters(bool resetPage = true)
+    {
+        var query = allProducts.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            query = query.Where(p => 
+                p.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) || 
+                p.Category.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                p.SKU.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedCategory))
+        {
+            query = query.Where(p => p.Category.Equals(selectedCategory, StringComparison.OrdinalIgnoreCase));
+        }
+
+        switch (stockFilter)
+        {
+            case "in-stock":
+                query = query.Where(p => p.StockQuantity > 10);
+                break;
+            case "low-stock":
+                query = query.Where(p => p.StockQuantity > 0 && p.StockQuantity <= 10);
+                break;
+            case "out-of-stock":
+                query = query.Where(p => p.StockQuantity == 0);
+                break;
+        }
+
+        filteredProducts = query.ToList();
+        if (resetPage)
+        {
+            currentPage = 1;
+        }
+        else
+        {
+            currentPage = Math.Clamp(currentPage, 1, Math.Max(1, TotalPages));
+        }
+        CalculateStats();
+    }
+
+    private void CalculateStats()
+    {
+        totalProducts = allProducts.Count;
+        inStockCount = allProducts.Count(p => p.StockQuantity > 10);
+        lowStockCount = allProducts.Count(p => p.StockQuantity > 0 && p.StockQuantity <= 10);
+        outOfStockCount = allProducts.Count(p => p.StockQuantity == 0);
+    }
+
+    private void GoToPage(int page)
+    {
+        if (page >= 1 && page <= TotalPages)
+        {
+            currentPage = page;
+            SyncUrlState();
+            StateHasChanged();
+        }
+    }
+
+    private void OnPageSizeChanged()
+    {
+        currentPage = 1;
+        SyncUrlState();
+        StateHasChanged();
+    }
+
+    private List<int> GetPageNumbers()
+    {
+        var pages = new List<int>();
+        int start = Math.Max(1, currentPage - 2);
+        int end = Math.Min(TotalPages, currentPage + 2);
+
+        if (end - start < 4)
+        {
+            if (start == 1) end = Math.Min(TotalPages, start + 4);
+            else start = Math.Max(1, end - 4);
+        }
+
+        for (int i = start; i <= end; i++) pages.Add(i);
+        return pages;
+    }
+
+    private void OnFilterChanged()
+    {
+        ApplyFilters();
+        SyncUrlState();
+        StateHasChanged();
+    }
+
+    private void ApplyDeepLinkFilters()
+    {
+        searchInput = QuerySearch ?? searchInput;
+        searchQuery = QuerySearch ?? searchQuery;
+
+        if (!string.IsNullOrWhiteSpace(QueryCategory))
+        {
+            selectedCategory = QueryCategory;
+        }
+
+        if (!string.IsNullOrWhiteSpace(QueryStock))
+        {
+            var normalizedStock = QueryStock.Trim().ToLowerInvariant();
+            if (normalizedStock is "all" or "in-stock" or "low-stock" or "out-of-stock")
+            {
+                stockFilter = normalizedStock;
+            }
+        }
+
+        if (QueryPageSize is 5 or 10 or 15 or 25 or 50)
+        {
+            pageSize = QueryPageSize.Value;
+        }
+
+        if (QueryPage is > 0)
+        {
+            currentPage = QueryPage.Value;
+        }
+
+        ApplyFilters(resetPage: false);
+    }
+
+    private void SyncUrlState()
+    {
+        var queryParts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            queryParts.Add($"q={Uri.EscapeDataString(searchQuery)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedCategory))
+        {
+            queryParts.Add($"category={Uri.EscapeDataString(selectedCategory)}");
+        }
+
+        if (!string.Equals(stockFilter, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            queryParts.Add($"stock={Uri.EscapeDataString(stockFilter)}");
+        }
+
+        if (currentPage > 1)
+        {
+            queryParts.Add($"page={currentPage}");
+        }
+
+        if (pageSize != 10)
+        {
+            queryParts.Add($"size={pageSize}");
+        }
+
+        var target = queryParts.Count > 0
+            ? $"/supervisor/inventory/stock?{string.Join("&", queryParts)}"
+            : "/supervisor/inventory/stock";
+
+        NavigationManager.NavigateTo(target, replace: true);
+    }
+
+    private async Task ExportToPdf()
+    {
+        await JSRuntime.InvokeVoidAsync("exportToPdf", "Inventory Stock Report");
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchInput = e.Value?.ToString() ?? string.Empty;
+        await DebouncedApplySearchAsync();
+    }
+
+    private async Task DebouncedApplySearchAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (token.IsCancellationRequested) return;
+            searchQuery = searchInput;
+            OnFilterChanged();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+    }
+}

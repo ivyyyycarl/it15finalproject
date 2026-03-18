@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SupportSalesManagement.Frontend</title>
+    <base href="/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css?v=20260301" />
+    <link rel="stylesheet" href="css/modern-design.css?v=20260301" />
+    <link rel="stylesheet" href="css/app.min.css?v=20260301" />
+    <link rel="stylesheet" href="css/landing.css?v=20260301" />
+    <link rel="stylesheet" href="css/erp-dashboard.css?v=20260301" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#4682B4" />
+    <link href="SupportSalesManagement.Frontend.styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+        <div
+            style="position: absolute; bottom: 20%; width: 100%; text-align: center; font-family: sans-serif; color: #666;">
+            Initializing Blazor WebAssembly...<br />
+            <small>If this stays here, the app failed to boot.</small>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <!-- Blazor-ApexCharts loads its JS modules dynamically via IJSRuntime import -->
+    <!-- No explicit script tags needed - the library handles loading apexcharts.esm.js and blazor-apexcharts.js -->
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="js/stripe-payment.js?v=20260301"></script>
+    <script src="js/pdf-export.js?v=20260301"></script>
+    <script src="js/support-call.js?v=20260305"></script>
+    <script src="_framework/blazor.webassembly.js?v=20260301"></script>
+</body>
+
+</html>

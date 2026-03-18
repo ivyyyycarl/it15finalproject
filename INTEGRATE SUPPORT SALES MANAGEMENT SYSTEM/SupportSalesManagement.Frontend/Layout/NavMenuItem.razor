@@ -1,0 +1,53 @@
+@* NavMenuItem.razor - Single navigation menu item *@
+<a href="@Href" class="@GetClasses()">
+    <div class="flex items-center gap-3">
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="@Icon" />
+            </svg>
+        }
+        @if (!Collapsed)
+        {
+            <span class="flex-1 truncate">@Label</span>
+            @if (BadgeCount > 0)
+            {
+                <span class="@GetBadgeClass() px-2 py-0.5 text-[10px] font-bold rounded-full">
+                    @BadgeCount
+                </span>
+            }
+        }
+        else if (BadgeCount > 0)
+        {
+            <span class="absolute top-2 right-2 w-2 h-2 @BadgeColor rounded-full"></span>
+        }
+    </div>
+</a>
+
+@code {
+    [Parameter] public string Icon { get; set; } = "";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Href { get; set; } = "#";
+    [Parameter] public bool Collapsed { get; set; }
+    [Parameter] public bool IsActive { get; set; }
+    [Parameter] public int BadgeCount { get; set; }
+    [Parameter] public string BadgeColor { get; set; } = "bg-[#F59E0B]";
+
+    private string GetClasses()
+    {
+        var baseClasses = "flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 relative";
+        var activeClasses = IsActive 
+            ? "bg-white/15 text-white shadow-lg border-l-4 border-[#91C4C3]" 
+            : "text-white/80 hover:bg-white/10 hover:text-white border-l-4 border-transparent";
+        
+        if (Collapsed)
+            baseClasses += " justify-center";
+        
+        return $"{baseClasses} {activeClasses}";
+    }
+
+    private string GetBadgeClass()
+    {
+        return $"{BadgeColor} text-white";
+    }
+}

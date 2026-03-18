@@ -1,0 +1,10 @@
+@page "/superadmin/customers/history"
+@layout SuperAdminLayout
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.NavigateTo("/superadmin/customers/profiles", replace: true);
+    }
+}

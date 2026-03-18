@@ -1,0 +1,134 @@
+@page "/dashboard"
+@inject NavigationManager NavigationManager
+@inject AuthenticationService AuthService
+@inject ApiClient ApiClient
+
+@using SupportSalesManagement.Frontend.Services
+@using SupportSalesManagement.Frontend.Models
+
+<PageTitle>Dashboard - SupportFlow</PageTitle>
+
+<div class="min-h-screen flex items-center justify-center bg-gray-50">
+    <div class="text-center text-gray-600">Redirecting...</div>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(50);
+
+        if (!AuthService.IsAuthenticated || AuthService.CurrentUser == null)
+        {
+            NavigationManager.NavigateTo("/login", replace: true);
+            return;
+        }
+
+        var role = AuthService.CurrentUser.Role;
+        if (role == UserRole.SuperAdmin)
+        {
+            NavigationManager.NavigateTo("/superadmin/dashboard", replace: true);
+            return;
+        }
+
+        ModuleAccessConfig? moduleAccessConfig = null;
+        TenantSubscriptionModel? tenantSubscription = null;
+
+        try
+        {
+            moduleAccessConfig = await ApiClient.GetModuleAccessConfigAsync();
+            tenantSubscription = await ApiClient.GetMySubscriptionAsync();
+        }
+        catch
+        {
+        }
+
+        var nextRoute = ResolveFirstAllowedRoute(role, moduleAccessConfig, tenantSubscription);
+        NavigationManager.NavigateTo(nextRoute, replace: true);
+    }
+
+    private static string ResolveFirstAllowedRoute(
+        UserRole role,
+        ModuleAccessConfig? moduleAccessConfig,
+        TenantSubscriptionModel? tenantSubscription)
+    {
+        var orderedModules = new[] { "dashboard", "tickets", "orders", "customers", "catalog", "reports", "notifications", "iam", "integrations", "calls" };
+        foreach (var moduleKey in orderedModules)
+        {
+            if (!ModuleVisibilityHelper.IsModuleVisible(moduleKey, role, moduleAccessConfig, tenantSubscription))
+            {
+                continue;
+            }
+
+            var route = GetModuleRouteForRole(moduleKey, role);
+            if (!string.IsNullOrWhiteSpace(route))
+            {
+                return route;
+            }
+        }
+
+        return role switch
+        {
+            UserRole.Admin => "/dashboard/admin",
+            UserRole.Supervisor => "/supervisor/dashboard",
+            UserRole.Agent => "/agent/dashboard",
+            UserRole.Customer => "/customer/dashboard",
+            _ => "/dashboard"
+        };
+    }
+
+    private static string? GetModuleRouteForRole(string moduleKey, UserRole role)
+    {
+        return role switch
+        {
+            UserRole.Admin => moduleKey switch
+            {
+                "dashboard" => "/dashboard/admin",
+                "catalog" => "/admin/inventory",
+                "orders" => "/admin/orders",
+                "tickets" => "/admin/tickets",
+                "customers" => "/admin/customers",
+                "iam" => "/admin/users",
+                "reports" => "/admin/reports",
+                "notifications" => "/admin/notifications",
+                "integrations" => "/admin/settings",
+                _ => null
+            },
+            UserRole.Supervisor => moduleKey switch
+            {
+                "dashboard" => "/supervisor/dashboard",
+                "catalog" => "/supervisor/inventory/stock",
+                "orders" => "/supervisor/orders",
+                "tickets" => "/supervisor/tickets",
+                "calls" => "/supervisor/calls",
+                "customers" => "/supervisor/customers/search",
+                "reports" => "/supervisor/reports",
+                "notifications" => "/supervisor/notifications",
+                "integrations" => "/supervisor/settings",
+                "iam" => "/supervisor/agents",
+                _ => null
+            },
+            UserRole.Agent => moduleKey switch
+            {
+                "dashboard" => "/agent/dashboard",
+                "orders" => "/agent/orders/history",
+                "tickets" => "/agent/tickets/assigned",
+                "calls" => "/agent/calls/history",
+                "customers" => "/agent/customers",
+                "reports" => "/agent/performance",
+                "notifications" => "/agent/notifications",
+                _ => null
+            },
+            UserRole.Customer => moduleKey switch
+            {
+                "dashboard" => "/customer/dashboard",
+                "catalog" => "/customer/shop",
+                "orders" => "/customer/orders",
+                "tickets" => "/customer/support",
+                "customers" => "/customer/profile",
+                "notifications" => "/customer/dashboard",
+                _ => null
+            },
+            _ => null
+        };
+    }
+}

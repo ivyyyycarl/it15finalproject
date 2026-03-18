@@ -1,0 +1,222 @@
+@page "/subscription/overview"
+@layout ERPMainLayout
+@attribute [Authorize]
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@using Microsoft.AspNetCore.Components
+
+<PageTitle>Subscription Overview</PageTitle>
+
+<div class="min-h-screen bg-gradient-to-br from-[#f7fafc] via-[#eef4f8] to-[#fff8dc] p-6">
+    <div class="max-w-6xl mx-auto space-y-4">
+        <div class="text-center space-y-2">
+            <div class="inline-flex items-center rounded-full border border-[#d7e6ef] bg-white px-3 py-1 text-[11px] font-semibold text-[#4682B4]">
+                Updated Subscription Dashboard
+            </div>
+            <h1 class="text-3xl font-extrabold text-[#1B3A4B]">Subscription Overview</h1>
+            <p class="text-sm text-[#5F9EA0] mt-1">Track your plan, usage, and upgrade options in one place.</p>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(checkoutStatusMessage))
+        {
+            <div class="max-w-6xl mx-auto mt-3 rounded-xl border px-4 py-3 text-sm @(checkoutStatusIsError ? "bg-red-50 border-red-200 text-red-700" : "bg-emerald-50 border-emerald-200 text-emerald-700")">
+                @checkoutStatusMessage
+            </div>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        </div>
+    }
+    else if (subscription == null)
+    {
+        <div class="bg-white border border-gray-200 rounded-xl p-6 text-sm text-gray-600">
+            No subscription found yet.
+        </div>
+    }
+    else
+    {
+        <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div class="bg-gradient-to-b from-[#e9f3f8] to-white p-4 rounded-xl border border-[#cfe3ef]">
+                <p class="text-xs uppercase tracking-wider text-gray-500">Company</p>
+                <p class="text-lg font-bold text-[#1B3A4B] mt-1">@subscription.TenantName</p>
+            </div>
+            <div class="bg-gradient-to-b from-[#edf4f8] to-white p-4 rounded-xl border border-[#d5e5ee]">
+                <p class="text-xs uppercase tracking-wider text-gray-500">Current Plan</p>
+                <p class="text-lg font-bold text-[#4682B4] mt-1">@subscription.PlanName</p>
+            </div>
+            <div class="bg-gradient-to-b from-[#edf8f3] to-white p-4 rounded-xl border border-[#d7eee1]">
+                <p class="text-xs uppercase tracking-wider text-gray-500">Max Users</p>
+                <p class="text-lg font-bold text-[#2f8f77] mt-1">@(subscription.MaxUsers <= 0 ? "Unlimited" : subscription.MaxUsers.ToString())</p>
+            </div>
+            <div class="bg-gradient-to-b from-[#fff9ea] to-white p-4 rounded-xl border border-[#f0e5bf]">
+                <p class="text-xs uppercase tracking-wider text-gray-500">Max Branches</p>
+                <p class="text-lg font-bold text-[#8a6a1d] mt-1">@(subscription.MaxBranches <= 0 ? "Unlimited" : subscription.MaxBranches.ToString())</p>
+            </div>
+        </div>
+
+        <div class="max-w-6xl mx-auto bg-white/90 backdrop-blur-sm border border-[#d7e6ef] rounded-2xl p-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <p><span class="font-semibold text-[#1B3A4B]">Plan Code:</span> @subscription.PlanCode</p>
+                <p><span class="font-semibold text-[#1B3A4B]">Status:</span> @subscription.Status</p>
+                <p><span class="font-semibold text-[#1B3A4B]">Started:</span> @subscription.StartsAt.ToLocalTime().ToString("MMM d, yyyy")</p>
+                <p><span class="font-semibold text-[#1B3A4B]">Next Billing:</span> @(subscription.NextBillingAt?.ToLocalTime().ToString("MMM d, yyyy") ?? "—")</p>
+                <p class="md:col-span-2"><span class="font-semibold text-[#1B3A4B]">Included Modules:</span> @GetIncludedModules()</p>
+            </div>
+        </div>
+
+        <div class="max-w-6xl mx-auto bg-white/90 backdrop-blur-sm border border-[#d7e6ef] rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base font-semibold text-[#1B3A4B]">Usage This Billing Period</h2>
+                <span class="text-xs text-[#5F9EA0]">
+                    @(usageOverview?.PeriodStart.ToLocalTime().ToString("MMM d") ?? "N/A")
+                    -
+                    @(usageOverview?.PeriodEnd.ToLocalTime().ToString("MMM d, yyyy") ?? "N/A")
+                </span>
+            </div>
+
+            @if (usageOverview?.Metrics == null || usageOverview.Metrics.Count == 0)
+            {
+                <p class="text-sm text-gray-500">Usage metrics are not available yet.</p>
+            }
+            else
+            {
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    @foreach (var metric in usageOverview.Metrics)
+                    {
+                        var statusClass = metric.IsExceeded
+                            ? "border-red-200 bg-red-50"
+                            : metric.IsNearLimit
+                                ? "border-[#f0e1b9] bg-[#fff9ea]"
+                                : "border-[#d7eee1] bg-[#edf8f3]";
+                        <div class="rounded-xl border p-3 @statusClass">
+                            <p class="text-xs uppercase tracking-wide text-gray-500">@metric.Label</p>
+                            <p class="text-lg font-bold text-[#1B3A4B] mt-1">@metric.UsedQuantity / @metric.AllowedQuantity @metric.Unit</p>
+                            <p class="text-xs text-gray-600 mt-1">@metric.UtilizationPercent.ToString("0.##")%</p>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="max-w-6xl mx-auto bg-white/90 backdrop-blur-sm border border-[#d7e6ef] rounded-2xl p-5">
+            <h2 class="text-base font-semibold text-[#1B3A4B] mb-3">Upgrade / Downgrade Plan</h2>
+            @if (availablePlans.Count == 0)
+            {
+                <p class="text-sm text-gray-500">No active plans available.</p>
+            }
+            else
+            {
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    @foreach (var plan in availablePlans)
+                    {
+                        var isCurrent = plan.Id == subscription.SubscriptionPlanId;
+                        <div class="rounded-2xl border @(isCurrent ? "border-[#4682B4] bg-gradient-to-br from-[#e9f3f8] to-white shadow-sm" : "border-gray-200 bg-white") p-4">
+                            <p class="text-sm font-semibold text-[#1B3A4B]">@plan.Name</p>
+                            <p class="text-xs text-[#5F9EA0]">@plan.Code</p>
+                            <p class="text-sm mt-2 text-gray-700">Monthly: <span class="font-semibold">₱@plan.MonthlyPrice.ToString("N2")</span></p>
+                            <p class="text-sm text-gray-700">Annual: <span class="font-semibold">₱@plan.AnnualPrice.ToString("N2")</span></p>
+                            <p class="text-xs text-gray-600 mt-2">
+                                @(plan.MaxUsers <= 0 ? "Unlimited users" : $"{plan.MaxUsers} users")
+                                ·
+                                @(plan.MaxBranches <= 0 ? "Unlimited branches" : $"{plan.MaxBranches} branches")
+                            </p>
+                            <div class="mt-3 flex items-center gap-2">
+                                <button class="px-3 py-1.5 rounded-lg text-xs font-semibold @(isCurrent ? "bg-gray-200 text-gray-600 cursor-not-allowed" : "bg-indigo-600 text-white hover:bg-indigo-700")"
+                                        disabled="@isCurrent"
+                                        @onclick='() => StartPlanCheckoutAsync(plan.Id, "Monthly")'>
+                                    Monthly
+                                </button>
+                                <button class="px-3 py-1.5 rounded-lg text-xs font-semibold @(isCurrent ? "bg-gray-200 text-gray-600 cursor-not-allowed" : "bg-violet-600 text-white hover:bg-violet-700")"
+                                        disabled="@isCurrent"
+                                        @onclick='() => StartPlanCheckoutAsync(plan.Id, "Annual")'>
+                                    Annual
+                                </button>
+                            </div>
+                            @if (isCurrent)
+                            {
+                                <div class="mt-3 text-[11px] font-semibold text-[#1E3A5F] bg-[#d9ebf6] rounded-md px-2 py-1 inline-flex">
+                                    Current Active Plan
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "checkout")]
+    public string? Checkout { get; set; }
+
+    [SupplyParameterFromQuery(Name = "session_id")]
+    public string? SessionId { get; set; }
+
+    private bool isLoading = true;
+    private TenantSubscriptionModel? subscription;
+    private SubscriptionUsageOverviewModel? usageOverview;
+    private List<SubscriptionPlanModel> availablePlans = new();
+    private string? checkoutStatusMessage;
+    private bool checkoutStatusIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.Equals(Checkout, "success", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(SessionId))
+        {
+            var applied = await ApiClient.ConfirmPlanChangeCheckoutAsync(SessionId);
+            checkoutStatusIsError = !applied;
+            checkoutStatusMessage = applied
+                ? "Plan change applied successfully. Module inclusions and limits are now updated."
+                : "Plan checkout was successful but plan application is still syncing. Please refresh in a few seconds.";
+        }
+        else if (string.Equals(Checkout, "cancelled", StringComparison.OrdinalIgnoreCase))
+        {
+            checkoutStatusIsError = true;
+            checkoutStatusMessage = "Plan change checkout was cancelled.";
+        }
+
+        await LoadOverviewAsync();
+        isLoading = false;
+    }
+
+    private async Task LoadOverviewAsync()
+    {
+        subscription = await ApiClient.GetMySubscriptionAsync();
+        usageOverview = await ApiClient.GetSubscriptionUsageOverviewAsync();
+        availablePlans = (await ApiClient.GetPublicSubscriptionPlansAsync() ?? new())
+            .Where(p => p.IsActive)
+            .OrderBy(p => p.MonthlyPrice)
+            .ToList();
+    }
+
+    private string GetIncludedModules()
+    {
+        if (subscription == null || string.IsNullOrWhiteSpace(subscription.IncludedModulesCsv))
+        {
+            return "Not specified";
+        }
+
+        return string.Join(", ",
+            subscription.IncludedModulesCsv
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
+    private async Task StartPlanCheckoutAsync(int planId, string billingCycle)
+    {
+        var response = await ApiClient.CreatePlanChangeCheckoutSessionAsync(new CreatePlanChangeCheckoutRequest
+        {
+            SubscriptionPlanId = planId,
+            BillingCycle = billingCycle
+        });
+
+        if (!string.IsNullOrWhiteSpace(response?.CheckoutUrl))
+        {
+            NavigationManager.NavigateTo(response.CheckoutUrl, forceLoad: true);
+        }
+    }
+}

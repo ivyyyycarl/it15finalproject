@@ -1,0 +1,104 @@
+@* Agent Performance Card Component *@
+@using SupportSalesManagement.Frontend.Models
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+    <div class="flex items-start justify-between mb-4">
+        <div class="flex items-center space-x-3">
+            <div class="relative">
+                <div
+                    class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                    <span class="text-white font-semibold text-lg">@GetInitials(Agent.Name)</span>
+                </div>
+                <div
+                    class="absolute -bottom-1 -right-1 w-4 h-4 @GetStatusColorClass(Agent.Status) border-2 border-white rounded-full">
+                </div>
+            </div>
+            <div>
+                <h4 class="font-semibold text-gray-900">@Agent.Name</h4>
+                <p class="text-sm text-gray-600">Agent ID: @Agent.Id</p>
+            </div>
+        </div>
+        <span class="@GetStatusBadgeClass(Agent.Status) px-2 py-1 text-xs font-medium rounded-full">
+            @Agent.Status
+        </span>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="bg-blue-50 rounded-lg p-3">
+            <p class="text-xs text-gray-600 mb-1">Tickets Today</p>
+            <p class="text-2xl font-bold text-blue-600">@Agent.TicketsHandledToday</p>
+        </div>
+        <div class="bg-green-50 rounded-lg p-3">
+            <p class="text-xs text-gray-600 mb-1">CSAT Score</p>
+            <p class="text-2xl font-bold text-green-600">@Agent.CustomerSatisfaction.ToString("F1")</p>
+        </div>
+    </div>
+
+    <div class="space-y-2 mb-4">
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-600">Avg Response</span>
+            <span class="font-medium text-gray-900">@Agent.AverageResponseTime</span>
+        </div>
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-600">Avg Call</span>
+            <span class="font-medium text-orange-600">@Agent.AverageCallDuration</span>
+        </div>
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-600">Sales Conv.</span>
+            <span class="font-medium text-gray-900">@Agent.SalesConversionRate.ToString("P0")</span>
+        </div>
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-600">Active Tickets</span>
+            <span class="font-medium text-gray-900">@Agent.ActiveTickets</span>
+        </div>
+    </div>
+
+    <div class="flex space-x-2">
+        <button @onclick="() => OnViewDetails.InvokeAsync(Agent)"
+            class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
+            View Details
+        </button>
+        <button @onclick="() => OnAssignTicket.InvokeAsync(Agent)"
+            class="flex-1 px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors">
+            Assign Ticket
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public AgentPerformance Agent { get; set; } = new();
+    [Parameter] public EventCallback<AgentPerformance> OnViewDetails { get; set; }
+    [Parameter] public EventCallback<AgentPerformance> OnAssignTicket { get; set; }
+
+    private string GetInitials(string name)
+    {
+        var parts = name.Split(' ');
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[1][0]}";
+        return name.Length > 0 ? name.Substring(0, Math.Min(2, name.Length)) : "NA";
+    }
+
+    private string GetStatusColorClass(string status)
+    {
+        return status switch
+        {
+            "Available" => "bg-green-500",
+            "Busy" => "bg-yellow-500",
+            "On Call" => "bg-blue-500",
+            "Offline" => "bg-gray-400",
+            _ => "bg-gray-400"
+        };
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Available" => "bg-green-100 text-green-800",
+            "Busy" => "bg-yellow-100 text-yellow-800",
+            "On Call" => "bg-blue-100 text-blue-800",
+            "Offline" => "bg-gray-100 text-gray-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+}

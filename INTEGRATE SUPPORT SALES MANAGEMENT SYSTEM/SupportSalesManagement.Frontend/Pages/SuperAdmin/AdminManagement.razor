@@ -1,0 +1,136 @@
+@page "/superadmin/admins"
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Manage Admins - Super Admin</PageTitle>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">Administrator Accounts</h1>
+            <p class="mt-2 text-sm text-gray-700">All administrators and supervisors with elevated access.</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+            <button @onclick='() => NavigationManager.NavigateTo("/superadmin/users")'
+                class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+                Full User Management
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex justify-center items-center py-12">
+            <div class="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+    }
+    else
+    {
+        <div class="mt-8 flex flex-col">
+            <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+                    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-300">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+                                    <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Role</th>
+                                    <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Branch</th>
+                                    <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+                                    <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Last Login</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                @foreach (var user in adminUsers)
+                                {
+                                    <tr>
+                                        <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+                                            <div class="flex items-center">
+                                                <div class="h-10 w-10 flex-shrink-0">
+                                                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-500">
+                                                        <span class="font-medium leading-none text-white">@(user.FirstName?.FirstOrDefault())@(user.LastName?.FirstOrDefault())</span>
+                                                    </span>
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="font-medium text-gray-900">@user.FirstName @user.LastName</div>
+                                                    <div class="text-gray-500">@user.Email</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                            <span class="inline-flex rounded-full bg-blue-100 px-2 text-xs font-semibold leading-5 text-blue-800">
+                                                @user.Role
+                                            </span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                            <span class="inline-flex rounded-full bg-violet-100 px-2 text-xs font-semibold leading-5 text-violet-800">
+                                                @FormatBranchLabel(user)
+                                            </span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                            @if (user.IsActive)
+                                            {
+                                                <span class="inline-flex rounded-full bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="inline-flex rounded-full bg-red-100 px-2 text-xs font-semibold leading-5 text-red-800">Inactive</span>
+                                            }
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                            @(user.LastLoginAt?.ToString("MMM dd, HH:mm") ?? "Never")
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<User> adminUsers = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var users = await ApiClient.GetSuperAdminUsersAsync();
+            if (users != null)
+            {
+                adminUsers = users.Where(u =>
+                    u.Role == UserRole.Admin || u.Role == UserRole.Supervisor || u.Role == UserRole.SuperAdmin
+                ).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading admins: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string FormatBranchLabel(User? user)
+    {
+        if (user is null || user.BranchId is null || user.BranchId <= 0)
+        {
+            return "Unassigned";
+        }
+
+        var branchName = string.IsNullOrWhiteSpace(user.BranchName) ? null : user.BranchName.Trim();
+        return branchName is null
+            ? $"#{user.BranchId}"
+            : $"{branchName} (#{user.BranchId})";
+    }
+}

@@ -1,0 +1,844 @@
+@page "/agent/orders"
+@page "/agent/orders/new"
+@page "/agent/orders/history"
+@page "/agent/orders/track"
+@layout AgentLayout
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+
+<PageTitle>Order Management | Agent Workspace</PageTitle>
+
+<!-- View Switcher / Tabs -->
+@{
+    var currentView = GetCurrentView();
+}
+
+<div class="h-[calc(100vh-theme(spacing.16))] flex flex-col bg-gray-50" style="font-family: 'Inter', sans-serif; font-size: 12px;">
+    <!-- Top Bar -->
+    <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm">
+        <div>
+            <h1 class="text-[21px] font-bold text-gray-900">Order Management</h1>
+            <p class="text-[12px] text-gray-500 font-medium">Process sales, track shipments, and view history</p>
+        </div>
+        <div class="flex bg-gray-100 p-1 rounded-xl">
+            <button @onclick='() => NavigateTo("new")'
+                class="px-4 py-2 rounded-lg text-sm font-bold transition-all @(currentView == "new" ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-900")">
+                New Order
+            </button>
+            <button @onclick='() => NavigateTo("history")'
+                class="px-4 py-2 rounded-lg text-sm font-bold transition-all @(currentView == "history" ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-900")">
+                Order History
+            </button>
+            <button @onclick='() => NavigateTo("track")'
+                class="px-4 py-2 rounded-lg text-sm font-bold transition-all @(currentView == "track" ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-900")">
+                Track Status
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 overflow-hidden relative">
+        @if (currentView == "new")
+        {
+            <div class="flex h-full">
+                <!-- POS Left: Product Catalog -->
+                <div class="flex-1 flex flex-col min-w-0 pr-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#151521]">
+                    <!-- Filters -->
+                    <div class="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 sticky top-0 z-10 bg-gray-50/95 dark:bg-[#151521]/95 backdrop-blur-sm">
+                        <div class="relative md:col-span-2">
+                            <input type="text" value="@searchInput" @oninput="OnCatalogSearchInput" placeholder="Search products by Name or SKU..." 
+                                class="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#2A2A35] border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-gray-900 dark:text-white" />
+                            <svg class="w-5 h-5 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </div>
+                        <select @bind="SelectedCategory" class="bg-white dark:bg-[#2A2A35] border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-[var(--color-primary)]">
+                            <option value="">All Categories</option>
+                            @foreach (var cat in Categories) { <option value="@cat">@cat</option> }
+                        </select>
+                    </div>
+
+                    <!-- Grid -->
+                    <div class="flex-1 overflow-y-auto p-4 pt-0">
+                         @if (IsLoading)
+                        {
+                            <div class="flex justify-center py-20"><div class="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--color-primary)]"></div></div>
+                        }
+                        else if (!FilteredProducts.Any())
+                        {
+                            <div class="text-center py-20 text-gray-500 dark:text-gray-400">
+                                <p>No products found.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                @foreach (var item in FilteredProducts)
+                                {
+                                    <div class="bg-white dark:bg-[#1E1E2D] rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col group">
+                                        <div class="h-32 bg-gray-100 dark:bg-[#25252b] flex items-center justify-center relative">
+                                            @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                            {
+                                                <img src="@item.ImageUrl" alt="@item.ProductName" class="w-full h-full object-cover" />
+                                            }
+                                            else
+                                            {
+                                                <svg class="w-12 h-12 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                            }
+                                            <div class="absolute top-2 right-2">
+                                                <span class="text-xs font-bold px-2 py-1 rounded-full @(item.StockQuantity < 10 ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" : "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300")">
+                                                    @(item.StockQuantity) in stock
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="p-4 flex-1 flex flex-col">
+                                            <h3 class="font-bold text-[#1E1E2D] dark:text-white line-clamp-1 mb-1" title="@item.ProductName">@item.ProductName</h3>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">@item.SKU</p>
+                                            <div class="mt-auto flex items-center justify-between">
+                                                <span class="font-bold text-lg text-[var(--color-primary)]">@($"₱{item.Price:N2}")</span>
+                                                <button @onclick="() => AddToCart(item)" disabled="@(item.StockQuantity < 1)" 
+                                                    class="bg-gray-100 dark:bg-[#32323F] hover:bg-[var(--color-primary)] hover:text-white dark:hover:bg-[var(--color-primary)] text-gray-600 dark:text-gray-300 p-2 rounded-lg transition-colors disabled:opacity-50">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- POS Right: Cart -->
+                <div class="w-96 flex flex-col bg-white dark:bg-[#1E1E2D] border-l border-gray-200 dark:border-gray-700 shadow-xl z-20">
+                    <div class="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-[#25252b]">
+                        <h2 class="font-bold text-[#1E1E2D] dark:text-white mb-2">Current Order</h2>
+                        <select @bind="SelectedCustomerId" class="w-full bg-white dark:bg-[#2A2A35] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-[var(--color-primary)]">
+                            <option value="0">Walk-in Customer</option>
+                            @foreach (var customer in Customers)
+                            {
+                                <option value="@customer.Id">@($"{customer.FirstName} {customer.LastName}")</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-4 space-y-3">
+                        @if (!CartItems.Any())
+                        {
+                            <div class="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-600">
+                                <svg class="w-16 h-16 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                <p class="text-sm">Your cart is empty</p>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var item in CartItems)
+                            {
+                                <div class="flex gap-3 bg-gray-50 dark:bg-[#25252b] p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                                    <div class="flex-1">
+                                        <h4 class="text-sm font-bold text-[#1E1E2D] dark:text-white line-clamp-1">@item.Product.ProductName</h4>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">@item.Product.Category</p>
+                                        <div class="mt-1 text-sm font-bold text-[var(--color-primary)]">@($"₱{(item.Product.Price * item.Quantity):N2}")</div>
+                                    </div>
+                                    <div class="flex flex-col items-end justify-between">
+                                        <div class="flex items-center bg-white dark:bg-[#1E1E2D] rounded-lg border border-gray-200 dark:border-gray-600">
+                                            <button @onclick="() => DecreaseQty(item)" class="px-2 py-1 text-gray-500 hover:text-[#1E1E2D] dark:hover:text-white">-</button>
+                                            <span class="px-1 text-sm font-medium text-[#1E1E2D] dark:text-white w-6 text-center">@item.Quantity</span>
+                                            <button @onclick="() => IncreaseQty(item)" class="px-2 py-1 text-gray-500 hover:text-[#1E1E2D] dark:hover:text-white">+</button>
+                                        </div>
+                                         <button @onclick="() => RemoveFromCart(item)" class="text-red-500 hover:text-red-600 text-xs mt-1">Remove</button>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <div class="p-4 bg-white dark:bg-[#1E1E2D] border-t border-gray-100 dark:border-gray-700 shadow-up">
+                        <div class="space-y-2 mb-4">
+                            <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+                                <span>Subtotal</span>
+                                <span>@($"₱{CartTotal:N2}")</span>
+                            </div>
+                             <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+                                <span>Tax (8%)</span>
+                                <span>@($"₱{(CartTotal * 0.08m):N2}")</span>
+                            </div>
+                            <div class="flex justify-between text-xl font-bold text-[#1E1E2D] dark:text-white pt-2 border-t border-gray-100 dark:border-gray-700">
+                                <span>Total</span>
+                                <span>@($"₱{(CartTotal * 1.08m):N2}")</span>
+                            </div>
+                        </div>
+                        <button @onclick="ProcessOrder" disabled="@(!CartItems.Any() || IsProcessing)" 
+                            class="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all">
+                             @if (IsProcessing)
+                            {
+                                <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                <span>Processing...</span>
+                            }
+                            else
+                            {
+                                <span>Place Order</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (currentView == "history")
+        {
+            <div class="p-6 h-full overflow-y-auto">
+                <!-- Summary Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="rounded-xl p-4 border border-blue-100 shadow-sm bg-gradient-to-br from-blue-50 to-white">
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="text-xs text-blue-600 font-semibold uppercase">Total Orders</div>
+                            <span class="text-lg">📦</span>
+                        </div>
+                        <div class="text-2xl font-bold text-[#1E1E2D]">@AllOrders.Count</div>
+                    </div>
+                    <div class="rounded-xl p-4 border border-emerald-100 shadow-sm bg-gradient-to-br from-emerald-50 to-white">
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="text-xs text-emerald-600 font-semibold uppercase">Total Revenue</div>
+                            <span class="text-lg">₱</span>
+                        </div>
+                        <div class="text-2xl font-bold text-emerald-700">@($"₱{AllOrders.Sum(o => o.TotalAmount):N2}")</div>
+                    </div>
+                    <div class="rounded-xl p-4 border border-amber-100 shadow-sm bg-gradient-to-br from-amber-50 to-white">
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="text-xs text-amber-700 font-semibold uppercase">Pending</div>
+                            <span class="text-lg">⏳</span>
+                        </div>
+                        <div class="text-2xl font-bold text-amber-700">@AllOrders.Count(o => o.Status == "Pending")</div>
+                    </div>
+                    <div class="rounded-xl p-4 border border-violet-100 shadow-sm bg-gradient-to-br from-violet-50 to-white">
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="text-xs text-violet-700 font-semibold uppercase">Completed</div>
+                            <span class="text-lg">✅</span>
+                        </div>
+                        <div class="text-2xl font-bold text-violet-700">@AllOrders.Count(o => o.Status == "Completed")</div>
+                    </div>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="mb-4 bg-white dark:bg-[#1E1E2D] rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+                    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_12rem] gap-3">
+                        <div class="relative">
+                            <input type="text" value="@historySearchInput" @oninput="OnHistorySearchInput" placeholder="Search by order number or customer name..." 
+                                class="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#2A2A35] border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-gray-900 dark:text-white" />
+                            <svg class="w-5 h-5 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </div>
+                        <select @bind="HistoryStatusFilter" @bind:after="OnHistoryFilterChanged"
+                            class="bg-white dark:bg-[#2A2A35] border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-[var(--color-primary)]">
+                            <option value="All">All Statuses</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Processing">Processing</option>
+                            <option value="Shipped">Shipped</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Refunded">Refunded</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Orders Table -->
+                <div class="bg-white dark:bg-[#1E1E2D] rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+                        <thead class="bg-gradient-to-r from-gray-50 to-blue-50/40 dark:bg-[#25252b]">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">#</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Order #</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customer</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            @if (FilteredOrders.Any())
+                            {
+                                @foreach(var (order, index) in PagedHistoryOrders.Select((o, i) => (o, i)))
+                                {
+                                    <tr class="hover:bg-blue-50/30 dark:hover:bg-white/5 transition-colors">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">@(((historyCurrentPage - 1) * historyPageSize) + index + 1)</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-[#1E1E2D] dark:text-white">@order.OrderNumber</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">@order.CustomerName</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">@order.OrderDate.ToString("MMM dd, yyyy HH:mm")</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-[#1E1E2D] dark:text-white">@($"₱{order.TotalAmount:N2}")</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold @GetStatusClass(order.Status)">
+                                                <span class="w-1.5 h-1.5 rounded-full @GetOrderStatusDotClass(order.Status)"></span>
+                                                @order.Status
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                            <button @onclick="() => ViewOrderDetails(order)" class="px-2.5 py-1 rounded-lg border border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold transition-colors">View</button>
+                                            @if (CanRequestRefund(order))
+                                            {
+                                                <button @onclick="() => RequestRefund(order)" class="ml-2 px-2.5 py-1 rounded-lg border border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold transition-colors">Request Refund</button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                                        No orders found.
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (FilteredOrdersList.Any())
+                {
+                    <div class="px-6 py-4 border-t border-gray-100 dark:border-gray-700 bg-white/80 dark:bg-transparent flex items-center justify-between">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            Showing @(((historyCurrentPage - 1) * historyPageSize) + 1)-@Math.Min(historyCurrentPage * historyPageSize, FilteredOrdersList.Count) of @FilteredOrdersList.Count · Page @historyCurrentPage/@HistoryTotalPages
+                        </p>
+                        <div class="flex items-center gap-2">
+                            <button type="button" @onclick="PreviousHistoryPage" disabled="@(historyCurrentPage <= 1)"
+                                    class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                            <button type="button" @onclick="NextHistoryPage" disabled="@(historyCurrentPage >= HistoryTotalPages)"
+                                    class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (currentView == "track")
+        {
+             <div class="p-6 h-full overflow-y-auto">
+                <div class="max-w-4xl mx-auto">
+                    <h2 class="text-2xl font-bold text-[#1E1E2D] dark:text-white mb-6">Track Order Status</h2>
+                    
+                    <!-- Search Input -->
+                    <div class="mb-6">
+                        <div class="relative">
+                            <input type="text" value="@trackSearchInput" @oninput="OnTrackSearchInput" placeholder="Enter order number (e.g. ORD-2023-001)..." 
+                                class="w-full pl-10 pr-4 py-3 bg-white dark:bg-[#2A2A35] border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-gray-900 dark:text-white" />
+                            <svg class="w-5 h-5 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </div>
+                    </div>
+
+                    @if (string.IsNullOrWhiteSpace(TrackSearchQuery))
+                    {
+                        <div class="bg-white dark:bg-[#1E1E2D] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
+                            <div class="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-6 text-[var(--color-primary)]">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                            </div>
+                            <h3 class="text-xl font-bold text-[#1E1E2D] dark:text-white mb-2">Enter Order Number</h3>
+                            <p class="text-gray-500 dark:text-gray-400">Enter an order number above to see real-time shipping updates.</p>
+                        </div>
+                    }
+                    else if (TrackedOrder == null)
+                    {
+                        <div class="bg-white dark:bg-[#1E1E2D] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 p-8 text-center">
+                            <div class="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </div>
+                            <h3 class="text-xl font-bold text-[#1E1E2D] dark:text-white mb-2">Order Not Found</h3>
+                            <p class="text-gray-500 dark:text-gray-400">No order found with the number "@TrackSearchQuery". Please check and try again.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="bg-white dark:bg-[#1E1E2D] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 p-6">
+                            <!-- Order Header -->
+                            <div class="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 class="text-xl font-bold text-[#1E1E2D] dark:text-white">@TrackedOrder.OrderNumber</h3>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">Order Date: @TrackedOrder.OrderDate.ToString("MMM dd, yyyy HH:mm")</p>
+                                    </div>
+                                    <span class="inline-flex items-center px-3 py-1 rounded-lg text-sm font-bold @GetStatusClass(TrackedOrder.Status)">@TrackedOrder.Status</span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span class="text-gray-500 dark:text-gray-400">Customer:</span>
+                                        <span class="ml-2 font-medium text-[#1E1E2D] dark:text-white">@TrackedOrder.CustomerName</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-500 dark:text-gray-400">Total Amount:</span>
+                                        <span class="ml-2 font-bold text-[var(--color-primary)]">@($"₱{TrackedOrder.TotalAmount:N2}")</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Timeline -->
+                            <div class="space-y-4">
+                                <h4 class="font-bold text-[#1E1E2D] dark:text-white mb-4">Order Timeline</h4>
+                                
+                                @{
+                                    var statuses = new[] { "Pending", "Processing", "Shipped", "Delivered" };
+                                    var currentStatusIndex = Array.IndexOf(statuses, TrackedOrder.Status);
+                                }
+
+                                @foreach (var (status, index) in statuses.Select((s, i) => (s, i)))
+                                {
+                                    var isCompleted = index <= currentStatusIndex;
+                                    var isCurrent = index == currentStatusIndex;
+                                    
+                                    <div class="flex items-start gap-4">
+                                        <div class="flex flex-col items-center">
+                                            <div class="w-10 h-10 rounded-full flex items-center justify-center border-2 @(isCompleted ? "bg-[var(--color-primary)] border-[var(--color-primary)]" : "bg-gray-100 dark:bg-[#2A2A35] border-gray-300 dark:border-gray-600")">
+                                                @if (isCompleted)
+                                                {
+                                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                                }
+                                                else
+                                                {
+                                                    <div class="w-3 h-3 rounded-full bg-gray-400"></div>
+                                                }
+                                            </div>
+                                            @if (index < statuses.Length - 1)
+                                            {
+                                                <div class="w-0.5 h-12 @(isCompleted ? "bg-[var(--color-primary)]" : "bg-gray-200 dark:bg-gray-700")"></div>
+                                            }
+                                        </div>
+                                        <div class="flex-1 pb-8">
+                                            <div class="font-bold text-[#1E1E2D] dark:text-white @(isCurrent ? "text-[var(--color-primary)]" : "")">@status</div>
+                                            @if (isCurrent)
+                                            {
+                                                <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Current status</div>
+                                            }
+                                            else if (isCompleted)
+                                            {
+                                                <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Completed</div>
+                                            }
+                                            else
+                                            {
+                                                <div class="text-sm text-gray-400 dark:text-gray-600 mt-1">Pending</div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(TrackedOrder.Notes))
+                            {
+                                <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                                    <h4 class="font-bold text-[#1E1E2D] dark:text-white mb-2">Notes</h4>
+                                    <p class="text-sm text-gray-600 dark:text-gray-300">@TrackedOrder.Notes</p>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+             </div>
+        }
+    </div>
+</div>
+
+@code {
+    // Product Display Model (wrapper for InventoryItem/Product)
+    private class ProductDisplayItem
+    {
+        public int Id { get; set; }
+        public string SKU { get; set; } = string.Empty;
+        public string ProductName { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
+        public string? ImageUrl { get; set; }
+    }
+
+    private List<ProductDisplayItem> AllProducts = new();
+    private List<Customer> Customers = new();
+    private List<Order> AllOrders = new();
+    private List<CartItem> CartItems = new();
+    
+    private string SearchQuery = "";
+    private string searchInput = "";
+    private string SelectedCategory = "";
+    private int SelectedCustomerId = 0;
+    private string HistorySearchQuery = "";
+    private string historySearchInput = "";
+    private string HistoryStatusFilter = "All";
+    private string TrackSearchQuery = "";
+    private string trackSearchInput = "";
+    
+    private bool IsLoading = true;
+    private bool IsProcessing = false;
+    private readonly Debouncer _catalogSearchDebouncer = new();
+    private readonly Debouncer _historySearchDebouncer = new();
+    private readonly Debouncer _trackSearchDebouncer = new();
+    private int historyCurrentPage = 1;
+    private const int historyPageSize = 20;
+
+    // View Management
+    private string GetCurrentView()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).ToLower();
+        if (relativePath.Contains("new")) return "new";
+        if (relativePath.Contains("history")) return "history";
+        if (relativePath.Contains("track")) return "track";
+        return "history"; // Default
+    }
+
+    private void NavigateTo(string view)
+    {
+        NavigationManager.NavigateTo($"/agent/orders/{view}");
+    }
+
+    // Computed Filters
+    private List<string> Categories => AllProducts.Select(p => p.Category).Where(c => !string.IsNullOrEmpty(c)).Distinct().OrderBy(c => c).ToList();
+
+    private IEnumerable<ProductDisplayItem> FilteredProducts => AllProducts
+        .Where(p => string.IsNullOrEmpty(SearchQuery) || p.ProductName.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) || p.SKU.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase))
+        .Where(p => string.IsNullOrEmpty(SelectedCategory) || p.Category == SelectedCategory);
+
+    private decimal CartTotal => CartItems.Sum(i => i.Quantity * i.Product.Price);
+
+    private IEnumerable<Order> FilteredOrders => AllOrders
+        .Where(o => HistoryStatusFilter == "All" || o.Status.Equals(HistoryStatusFilter, StringComparison.OrdinalIgnoreCase))
+        .Where(o => string.IsNullOrWhiteSpace(HistorySearchQuery) || 
+                    o.OrderNumber.Contains(HistorySearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    o.CustomerName.Contains(HistorySearchQuery, StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(o => o.OrderDate);
+    private List<Order> FilteredOrdersList => FilteredOrders.ToList();
+    private int HistoryTotalPages => Math.Max(1, (int)Math.Ceiling(FilteredOrdersList.Count / (double)historyPageSize));
+    private List<Order> PagedHistoryOrders => FilteredOrdersList
+        .Skip((historyCurrentPage - 1) * historyPageSize)
+        .Take(historyPageSize)
+        .ToList();
+
+    private Order? TrackedOrder => AllOrders.FirstOrDefault(o => 
+        o.OrderNumber.Equals(TrackSearchQuery, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        IsLoading = true;
+        try
+        {
+            await Task.WhenAll(
+                LoadInventory(),
+                LoadCustomers(),
+                LoadOrders()
+            );
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task LoadInventory()
+    {
+        try
+        {
+            // Use Products API as primary source (admin-added products with images)
+            var products = await ApiClient.GetProductsAsync();
+
+            if (products != null && products.Any())
+            {
+                // Build stock quantity map from ERP inventory for accurate stock levels
+                var stockMap = new Dictionary<int, int>();
+                var erpStockBySku = new Dictionary<string, int>();
+                try
+                {
+                    var inventoryItems = await ApiClient.GetErpInventoryAsync();
+                    if (inventoryItems != null)
+                    {
+                        foreach (var item in inventoryItems)
+                        {
+                            stockMap[item.Id] = item.StockQuantity;
+                            if (!string.IsNullOrEmpty(item.SKU))
+                                erpStockBySku[item.SKU] = item.StockQuantity;
+                        }
+                    }
+                }
+                catch { /* ERP inventory not available, use product stock */ }
+
+                AllProducts = products
+                    .Where(p => p.IsActive)
+                    .Select(p => new ProductDisplayItem
+                    {
+                        Id = p.Id,
+                        SKU = p.SKU,
+                        ProductName = p.Name,
+                        Category = p.Category,
+                        Price = p.Price,
+                        StockQuantity = erpStockBySku.GetValueOrDefault(p.SKU, stockMap.GetValueOrDefault(p.Id, p.StockQuantity)),
+                        ImageUrl = p.ImageUrl
+                    }).ToList();
+            }
+            else
+            {
+                // Fallback to ERP Inventory only if Products API returns nothing
+                var inventoryItems = await ApiClient.GetErpInventoryAsync();
+                if (inventoryItems != null && inventoryItems.Any())
+                {
+                    AllProducts = inventoryItems.Select(item => new ProductDisplayItem
+                    {
+                        Id = item.Id,
+                        SKU = item.SKU,
+                        ProductName = item.ProductName,
+                        Category = item.Category,
+                        Price = item.UnitCost,
+                        StockQuantity = item.StockQuantity,
+                        ImageUrl = null
+                    }).ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading inventory: {ex.Message}");
+        }
+    }
+
+    private async Task LoadCustomers()
+    {
+        try
+        {
+            var customers = await ApiClient.GetCustomersAsync();
+            if (customers != null)
+            {
+                Customers = customers.Where(c => c.IsActive).OrderBy(c => c.FirstName).ThenBy(c => c.LastName).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading customers: {ex.Message}");
+        }
+    }
+
+    private async Task LoadOrders()
+    {
+        try
+        {
+            var orders = await ApiClient.GetOrdersAsync();
+            if (orders != null)
+            {
+                AllOrders = orders.OrderByDescending(o => o.OrderDate).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading orders: {ex.Message}");
+        }
+    }
+
+    private void AddToCart(ProductDisplayItem product)
+    {
+        var existing = CartItems.FirstOrDefault(c => c.Product.Id == product.Id);
+        if (existing != null)
+        {
+            if (existing.Quantity < product.StockQuantity) existing.Quantity++;
+        }
+        else
+        {
+            CartItems.Add(new CartItem { Product = product, Quantity = 1 });
+        }
+    }
+
+    private void IncreaseQty(CartItem item) 
+    { 
+        var product = AllProducts.FirstOrDefault(p => p.Id == item.Product.Id);
+        if (product != null && item.Quantity < product.StockQuantity) 
+            item.Quantity++; 
+    }
+    
+    private void DecreaseQty(CartItem item) 
+    { 
+        if (item.Quantity > 1) 
+            item.Quantity--; 
+        else 
+            CartItems.Remove(item); 
+    }
+    
+    private void RemoveFromCart(CartItem item) => CartItems.Remove(item);
+
+    private async Task ProcessOrder()
+    {
+        if (!CartItems.Any() || SelectedCustomerId < 0)
+            return;
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Confirm place order with total ₱{(CartTotal * 1.08m):N2}?");
+        if (!confirmed)
+            return;
+
+        IsProcessing = true;
+        try
+        {
+            // If SelectedCustomerId is 0, we need to handle walk-in customer
+            // For now, we'll require a customer selection or create a default customer
+            if (SelectedCustomerId == 0)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Please select a customer for this order.");
+                IsProcessing = false;
+                return;
+            }
+
+            var request = new CreateOrderRequest
+            {
+                CustomerId = SelectedCustomerId,
+                Notes = "",
+                OrderDate = DateTime.Now,
+                Status = "Pending",
+                OrderDetails = CartItems.Select(item => new CreateOrderDetailRequest
+                {
+                    ProductId = item.Product.Id,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.Product.Price,
+                    DiscountPercentage = 0
+                }).ToList(),
+                TotalAmount = CartTotal * 1.08m // Including tax
+            };
+
+            var (order, errorMessage) = await ApiClient.CreateOrderWithResultAsync(request);
+            if (order != null)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", $"Order {order.OrderNumber} placed successfully!");
+                CartItems.Clear();
+                SelectedCustomerId = 0;
+                await LoadOrders(); // Refresh orders list
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", $"Failed to create order: {errorMessage ?? "Unknown error"}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+
+    private void ViewOrderDetails(Order order)
+    {
+        // Navigate to order details or show modal
+        // For now, just show an alert with order info
+        JSRuntime.InvokeVoidAsync("alert", $"Order {order.OrderNumber}\nCustomer: {order.CustomerName}\nTotal: ₱{order.TotalAmount:N2}\nStatus: {order.Status}");
+    }
+
+    private static bool CanRequestRefund(Order order)
+    {
+        var status = order.Status ?? string.Empty;
+        return status.Equals("Delivered", StringComparison.OrdinalIgnoreCase)
+               || status.Equals("Completed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task RequestRefund(Order order)
+    {
+        if (!CanRequestRefund(order))
+        {
+            return;
+        }
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Request refund for order {order.OrderNumber}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var reason = await JSRuntime.InvokeAsync<string?>("prompt", "Enter refund reason:", "Customer requested refund");
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return;
+        }
+
+        var (success, message) = await ApiClient.RequestOrderRefundAsync(order.Id, reason);
+        await JSRuntime.InvokeVoidAsync("alert", message);
+        if (success)
+        {
+            await LoadOrders();
+        }
+    }
+
+    private string GetStatusClass(string status) => status switch {
+        "Completed" => "bg-[var(--color-success)]/10 text-[var(--color-success-dark)]",
+        "Processing" => "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+        "Shipped" => "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+        "Delivered" => "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+        "Refunded" => "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300",
+        "Pending" => "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+        _ => "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300"
+    };
+
+    private string GetOrderStatusDotClass(string status) => status switch
+    {
+        "Completed" or "Delivered" => "bg-emerald-500",
+        "Processing" => "bg-blue-500",
+        "Shipped" => "bg-violet-500",
+        "Refunded" => "bg-rose-500",
+        "Pending" => "bg-amber-500",
+        _ => "bg-gray-500"
+    };
+
+    private class CartItem
+    {
+        public ProductDisplayItem Product { get; set; } = new();
+        public int Quantity { get; set; }
+    }
+
+    private async Task OnCatalogSearchInput(ChangeEventArgs e)
+    {
+        searchInput = e.Value?.ToString() ?? string.Empty;
+        await _catalogSearchDebouncer.DebounceAsync(async () =>
+        {
+            SearchQuery = searchInput;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private async Task OnHistorySearchInput(ChangeEventArgs e)
+    {
+        historySearchInput = e.Value?.ToString() ?? string.Empty;
+        await _historySearchDebouncer.DebounceAsync(async () =>
+        {
+            HistorySearchQuery = historySearchInput;
+            historyCurrentPage = 1;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void OnHistoryFilterChanged()
+    {
+        historyCurrentPage = 1;
+    }
+
+    private void PreviousHistoryPage()
+    {
+        if (historyCurrentPage <= 1) return;
+        historyCurrentPage--;
+    }
+
+    private void NextHistoryPage()
+    {
+        if (historyCurrentPage >= HistoryTotalPages) return;
+        historyCurrentPage++;
+    }
+
+    private async Task OnTrackSearchInput(ChangeEventArgs e)
+    {
+        trackSearchInput = e.Value?.ToString() ?? string.Empty;
+        await _trackSearchDebouncer.DebounceAsync(async () =>
+        {
+            TrackSearchQuery = trackSearchInput;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    public void Dispose()
+    {
+        _catalogSearchDebouncer.Dispose();
+        _historySearchDebouncer.Dispose();
+        _trackSearchDebouncer.Dispose();
+    }
+}

@@ -1,0 +1,232 @@
+@page "/supervisor/financials/refunds"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor,Admin")]
+@inject SupportSalesManagement.Frontend.Services.ApiClient ApiClient
+
+<div class="p-6 space-y-4" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-[22px] font-bold text-gray-900">Refunds & Cancellations Summary</h1>
+                <p class="text-sm text-gray-500">Track refunds and order cancellations (Read-Only Access)</p>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span class="text-xs font-medium text-yellow-800">Read-Only Access</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-gradient-to-br from-rose-50 to-white p-5 rounded-xl border border-rose-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Total Refunds</p>
+                    <p class="text-2xl font-bold text-red-600">₱@totalRefunds.ToString("N2")</p>
+                    <p class="text-xs text-gray-500 mt-1">This month</p>
+                </div>
+                <div class="p-3 bg-red-100 rounded-full">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-orange-50 to-white p-5 rounded-xl border border-orange-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Total Cancellations</p>
+                    <p class="text-2xl font-bold text-orange-600">@totalCancellations</p>
+                    <p class="text-xs text-gray-500 mt-1">This month</p>
+                </div>
+                <div class="p-3 bg-orange-100 rounded-full">
+                    <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-amber-50 to-white p-5 rounded-xl border border-amber-100 shadow-sm">
+           <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Refund Rate</p>
+                    <p class="text-2xl font-bold text-yellow-600">@refundRate%</p>
+                    <p class="text-xs text-gray-500 mt-1">Of total orders</p>
+                </div>
+                <div class="p-3 bg-yellow-100 rounded-full">
+                    <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-50 to-white p-5 rounded-xl border border-blue-100 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Avg. Refund Time</p>
+                    <p class="text-2xl font-bold text-blue-600">@avgRefundTime</p>
+                    <p class="text-xs text-gray-500 mt-1">hours</p>
+                </div>
+                <div class="p-3 bg-blue-100 rounded-full">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Refund Reasons -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Top Refund Reasons</h2>
+            <div class="space-y-3">
+                @foreach (var reason in refundReasons)
+                {
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm text-gray-700">@reason.Reason</span>
+                            <span class="text-sm font-semibold text-gray-900">@reason.Count</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-red-500 h-2 rounded-full" style="width: @reason.Percentage%"></div>
+                        </div>
+                        <span class="text-xs text-gray-500">@reason.Percentage% of total refunds</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Top Cancellation Reasons</h2>
+            <div class="space-y-3">
+                @foreach (var reason in cancellationReasons)
+                {
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm text-gray-700">@reason.Reason</span>
+                            <span class="text-sm font-semibold text-gray-900">@reason.Count</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-orange-500 h-2 rounded-full" style="width: @reason.Percentage%"></div>
+                        </div>
+                        <span class="text-xs text-gray-500">@reason.Percentage% of total cancellations</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Refunds & Cancellations -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Recent Refunds & Cancellations</h2>
+            <select class="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <option>All</option>
+                <option>Refunds Only</option>
+                <option>Cancellations Only</option>
+            </select>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    @foreach (var item in recentItems)
+                    {
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                @if (item.Type == "Refund")
+                                {
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                        Refund
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                                        Cancel
+                                    </span>
+                                }
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">@item.OrderId</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">@item.CustomerName</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">₱@item.Amount.ToString("N2")</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">@item.Reason</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@item.Date.ToString("MMM dd, yyyy")</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    @item.Status
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private decimal totalRefunds = 4250.75m;
+    private int totalCancellations = 23;
+    private decimal refundRate = 2.7m;
+    private decimal avgRefundTime = 18.5m;
+
+    private class ReasonData
+    {
+        public string Reason { get; set; } = "";
+        public int Count { get; set; }
+        public int Percentage { get; set; }
+    }
+
+    private class RefundCancellationItem
+    {
+        public string Type { get; set; } = "";
+        public string OrderId { get; set; } = "";
+        public string CustomerName { get; set; } = "";
+        public decimal Amount { get; set; }
+        public string Reason { get; set; } = "";
+        public DateTime Date { get; set; }
+        public string Status { get; set; } = "";
+    }
+
+    private List<ReasonData> refundReasons = new()
+    {
+        new ReasonData { Reason = "Product defect/damage", Count = 12, Percentage = 40 },
+        new ReasonData { Reason = "Wrong size/fit", Count = 9, Percentage = 30 },
+        new ReasonData { Reason = "Not as described", Count = 6, Percentage = 20 },
+        new ReasonData { Reason = "Changed mind", Count = 3, Percentage = 10 }
+    };
+
+    private List<ReasonData> cancellationReasons = new()
+    {
+        new ReasonData { Reason = "Requested by customer", Count = 10, Percentage = 43 },
+        new ReasonData { Reason = "Payment failed", Count = 7, Percentage = 30 },
+        new ReasonData { Reason = "Out of stock", Count = 4, Percentage = 17 },
+        new ReasonData { Reason = "Duplicate order", Count = 2, Percentage = 10 }
+    };
+
+    private List<RefundCancellationItem> recentItems = new()
+    {
+        new RefundCancellationItem { Type = "Refund", OrderId = "ORD-8920", CustomerName = "Alice Cooper", Amount = 89.99m, Reason = "Product defect", Date = DateTime.Now.AddHours(-3), Status = "Processed" },
+        new RefundCancellationItem { Type = "Cancel", OrderId = "ORD-8915", CustomerName = "Bob Martin", Amount = 145.50m, Reason = "Payment failed", Date = DateTime.Now.AddHours(-6), Status = "Completed" },
+        new RefundCancellationItem { Type = "Refund", OrderId = "ORD-8910", CustomerName = "Carol White", Amount = 215.00m, Reason = "Wrong size", Date = DateTime.Now.AddHours(-12), Status = "Processed" },
+        new RefundCancellationItem { Type = "Cancel", OrderId = "ORD-8905", CustomerName = "David Lee", Amount = 67.25m, Reason = "Requested by customer", Date = DateTime.Now.AddDays(-1), Status = "Completed" }
+    };
+}

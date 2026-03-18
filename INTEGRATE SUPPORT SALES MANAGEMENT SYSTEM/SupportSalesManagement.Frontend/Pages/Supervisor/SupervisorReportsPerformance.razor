@@ -1,0 +1,198 @@
+@page "/supervisor/reports/performance"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor,Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+@inject IJSRuntime JSRuntime
+
+<div class="p-6 space-y-4" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="mb-6 flex items-center justify-between">
+        <div>
+            <h1 class="text-[22px] font-bold text-gray-900">Agent Performance Reports</h1>
+            <p class="text-sm text-gray-500">Analyze agent productivity and performance metrics</p>
+        </div>
+        <button @onclick="ExportToPdf" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Export to PDF
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-8">
+            <p class="text-gray-500">Loading performance data...</p>
+        </div>
+    }
+    else
+    {
+        <!-- Performance Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-slate-50 to-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <p class="text-sm text-gray-600">Total Agents</p>
+                <p class="text-2xl font-bold text-gray-900">@totalAgents</p>
+                <p class="text-xs text-gray-500 mt-1">Active agents</p>
+            </div>
+            <div class="bg-gradient-to-br from-blue-50 to-white p-5 rounded-xl border border-blue-100 shadow-sm">
+                <p class="text-sm text-gray-600">Total Orders</p>
+                <p class="text-2xl font-bold text-blue-600">@totalOrders</p>
+                <p class="text-xs text-gray-500 mt-1">All time</p>
+            </div>
+            <div class="bg-gradient-to-br from-emerald-50 to-white p-5 rounded-xl border border-emerald-100 shadow-sm">
+                <p class="text-sm text-gray-600">Total Tickets</p>
+                <p class="text-2xl font-bold text-green-600">@totalTickets</p>
+                <p class="text-xs text-gray-500 mt-1">All tickets</p>
+            </div>
+        </div>
+
+        <!-- Agent Leaderboard -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Agent Leaderboard</h2>
+            </div>
+            @if (agentPerformance.Any())
+            {
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tickets Resolved</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg. Resolution Time</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satisfaction Score</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @foreach (var (agent, index) in agentPerformance.Select((a, i) => (a, i)))
+                        {
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">@(index + 1)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">@agent.Name</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">@agent.TicketsResolved</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@agent.AvgResolutionTime.ToString("F1") hrs</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                                    @agent.SatisfactionScore.ToString("F1")%
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="px-6 py-8 text-center text-gray-500">
+                    <p>No agent performance data available.</p>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private int totalAgents = 0;
+    private int totalOrders = 0;
+    private int totalTickets = 0;
+
+    private class AgentPerformanceData
+    {
+        public string Name { get; set; } = "";
+        public int TicketsResolved { get; set; }
+        public decimal AvgResolutionTime { get; set; }
+        public decimal SatisfactionScore { get; set; }
+    }
+
+    private List<AgentPerformanceData> agentPerformance = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPerformanceData();
+    }
+
+    private async Task LoadPerformanceData()
+    {
+        try
+        {
+            isLoading = true;
+
+            // Load all data in parallel
+            var usersTask = ApiClient.GetUsersAsync();
+            var ordersTask = ApiClient.GetOrdersAsync();
+            var ticketsTask = ApiClient.GetTicketsAsync();
+
+            await Task.WhenAll(usersTask, ordersTask, ticketsTask);
+
+            var allUsers = await usersTask ?? new List<User>();
+            var allOrders = await ordersTask ?? new List<Order>();
+            var allTickets = await ticketsTask ?? new List<Ticket>();
+
+            // Filter agents
+            var agents = allUsers.Where(u => u.Role == UserRole.Agent && u.IsActive).ToList();
+            totalAgents = agents.Count;
+            totalOrders = allOrders.Count;
+            totalTickets = allTickets.Count;
+
+            // Calculate performance metrics for each agent
+            agentPerformance = agents.Select(agent =>
+            {
+                var agentTickets = allTickets.Where(t => t.AssignedAgentId == agent.Id).ToList();
+                var resolvedTickets = agentTickets.Where(t => 
+                    t.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase) || 
+                    t.Status.Equals("Closed", StringComparison.OrdinalIgnoreCase)).ToList();
+
+                var ticketsResolved = resolvedTickets.Count;
+
+                // Calculate average resolution time in hours
+                decimal avgResolutionTime = 0;
+                if (resolvedTickets.Any())
+                {
+                    var resolutionTimes = resolvedTickets
+                        .Where(t => t.ResolvedAt.HasValue)
+                        .Select(t => (t.ResolvedAt!.Value - t.CreatedAt).TotalHours)
+                        .ToList();
+
+                    if (resolutionTimes.Any())
+                    {
+                        avgResolutionTime = (decimal)resolutionTimes.Average();
+                    }
+                }
+
+                // Calculate satisfaction score based on resolution rate and performance
+                // This is a calculated metric: base score from resolution rate, adjusted by resolution time
+                decimal satisfactionScore = 0;
+                if (agentTickets.Any())
+                {
+                    var resolutionRate = (decimal)ticketsResolved / agentTickets.Count * 100;
+                    // Adjust based on resolution time (faster = better, max 100)
+                    var timeAdjustment = avgResolutionTime > 0 ? Math.Min(20, 100 / (avgResolutionTime + 1)) : 0;
+                    satisfactionScore = Math.Min(100, resolutionRate * 0.8m + timeAdjustment);
+                }
+
+                return new AgentPerformanceData
+                {
+                    Name = agent.Name,
+                    TicketsResolved = ticketsResolved,
+                    AvgResolutionTime = avgResolutionTime,
+                    SatisfactionScore = satisfactionScore
+                };
+            })
+            .OrderByDescending(a => a.TicketsResolved)
+            .ThenBy(a => a.AvgResolutionTime)
+            .ToList();
+
+            isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading performance data: {ex.Message}");
+            isLoading = false;
+        }
+    }
+
+    private async Task ExportToPdf()
+    {
+        await JSRuntime.InvokeVoidAsync("exportToPdf", "Agent Performance Report");
+    }
+}

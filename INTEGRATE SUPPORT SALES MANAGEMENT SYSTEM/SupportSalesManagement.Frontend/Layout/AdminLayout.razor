@@ -1,0 +1,618 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager NavigationManager
+@inject SupportSalesManagement.Frontend.Services.ApiClient ApiClient
+@inject SupportSalesManagement.Frontend.Services.AuthenticationService AuthService
+@using SupportSalesManagement.Frontend.Models
+@using Microsoft.AspNetCore.Components.Routing
+
+<div class="erp-main-container flex h-screen bg-[#F3F4F6] overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar flex flex-col flex-shrink-0 h-full shadow-xl font-sans text-white border-r border-white/10
+                  @GetSidebarClass()">
+        <!-- Brand Header -->
+        <div
+            class="h-16 flex items-center px-4 border-b border-white/8 @(isSidebarExpanded ? "justify-between" : "justify-center") shrink-0 relative">
+            <div class="absolute inset-0 bg-gradient-to-r from-violet-900/10 to-transparent pointer-events-none"></div>
+            @if (isSidebarExpanded)
+            {
+                <div class="flex items-center gap-3 overflow-hidden min-w-0 relative z-10">
+                    <div
+                        class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-violet-500/25 to-indigo-500/15 rounded-xl flex items-center justify-center border border-violet-400/25 text-violet-300 font-bold text-sm shadow-lg shadow-violet-500/10">
+                        CF
+                    </div>
+                    <div class="flex flex-col truncate">
+                        <span class="font-bold text-white text-sm leading-tight truncate tracking-wide">ClassicFit</span>
+                        <span class="text-[10px] text-violet-300/60 font-medium tracking-widest uppercase truncate mt-0.5">Sales &
+                            Support</span>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Navigation Menu -->
+        <nav class="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
+
+            @if (IsModuleVisible("dashboard"))
+            {
+                <!-- Dashboard -->
+                <a href="/dashboard/admin"
+                    class="flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative @(IsActive("/dashboard/admin") || IsActive("/admin") || IsActive("/admin/dashboard") ? "bg-blue-600/10 text-blue-400 border-r-2 border-blue-500" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-100")">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                        </svg>
+                    </div>
+                    @if (isSidebarExpanded)
+                    {
+                        <span class="font-medium truncate text-sm">Dashboard</span>
+                    }
+                </a>
+            }
+
+            @if (IsModuleVisible("catalog"))
+            {
+            <!-- Items / Products Dropdown -->
+            <div class="space-y-1">
+                <button @onclick='() => ToggleGroup("admin-inventory")'
+                    class="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative @(IsActive("/admin/inventory") ? "bg-blue-600/10 text-blue-400" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-100")">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                    </div>
+                    @if (isSidebarExpanded)
+                    {
+                        <span class="flex-1 text-left font-medium truncate text-sm">Items / Products</span>
+                        <svg class="w-4 h-4 text-gray-500 transition-transform duration-200 @(expandedGroups.Contains("admin-inventory") ? "rotate-180" : "")"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    }
+                </button>
+                @if (isSidebarExpanded && expandedGroups.Contains("admin-inventory"))
+                {
+                    <div class="pl-11 space-y-1">
+                        <a href="/admin/inventory"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">View All</a>
+                        <a href="/admin/products/new"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">Add Product</a>
+                    </div>
+                }
+            </div>
+            }
+
+            @if (IsModuleVisible("orders"))
+            {
+            <!-- Orders Dropdown -->
+            <div class="space-y-1">
+                <button @onclick='() => ToggleGroup("admin-orders")'
+                    class="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative @(IsActive("/admin/orders") ? "bg-blue-600/10 text-blue-400" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-100")">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                    </div>
+                    @if (isSidebarExpanded)
+                    {
+                        <span class="flex-1 text-left font-medium truncate text-sm">Orders</span>
+                        <svg class="w-4 h-4 text-gray-500 transition-transform duration-200 @(expandedGroups.Contains("admin-orders") ? "rotate-180" : "")"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    }
+                </button>
+                @if (isSidebarExpanded && expandedGroups.Contains("admin-orders"))
+                {
+                    <div class="pl-11 space-y-1">
+                        <a href="/admin/orders"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">View Orders</a>
+                        <a href="/admin/orders/track"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">Tracking</a>
+                    </div>
+                }
+            </div>
+            }
+
+            @if (IsModuleVisible("tickets"))
+            {
+            <!-- Tickets Dropdown -->
+            <div class="space-y-1">
+                <button @onclick='() => ToggleGroup("admin-tickets")'
+                    class="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative @(IsActive("/admin/tickets") ? "bg-blue-600/10 text-blue-400" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-100")">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                        </svg>
+                    </div>
+                    @if (isSidebarExpanded)
+                    {
+                        <span class="flex-1 text-left font-medium truncate text-sm">Tickets</span>
+                        <svg class="w-4 h-4 text-gray-500 transition-transform duration-200 @(expandedGroups.Contains("admin-tickets") ? "rotate-180" : "")"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    }
+                </button>
+                @if (isSidebarExpanded && expandedGroups.Contains("admin-tickets"))
+                {
+                    <div class="pl-11 space-y-1">
+                        <a href="/admin/tickets"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">View All</a>
+                        <a href="/admin/tickets/escalated"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">Escalations</a>
+                    </div>
+                }
+            </div>
+            }
+
+            @if (IsModuleVisible("customers"))
+            {
+            <!-- Customers Dropdown -->
+            <div class="space-y-1">
+                <button @onclick='() => ToggleGroup("admin-customers")'
+                    class="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative @(IsActive("/admin/customers") ? "bg-blue-600/10 text-blue-400" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-100")">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                    </div>
+                    @if (isSidebarExpanded)
+                    {
+                        <span class="flex-1 text-left font-medium truncate text-sm">Customers</span>
+                        <svg class="w-4 h-4 text-gray-500 transition-transform duration-200 @(expandedGroups.Contains("admin-customers") ? "rotate-180" : "")"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    }
+                </button>
+                @if (isSidebarExpanded && expandedGroups.Contains("admin-customers"))
+                {
+                    <div class="pl-11 space-y-1">
+                        <a href="/admin/customers"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">View All</a>
+                        <a href="/admin/customers"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">Search</a>
+                    </div>
+                }
+            </div>
+            }
+
+            @if (IsModuleVisible("iam"))
+            {
+            <!-- Users & Roles Dropdown -->
+            <div class="space-y-1">
+                <button @onclick='() => ToggleGroup("admin-users")'
+                    class="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative @(IsActive("/admin/users") ? "bg-blue-600/10 text-blue-400" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-100")">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                    </div>
+                    @if (isSidebarExpanded)
+                    {
+                        <span class="flex-1 text-left font-medium truncate text-sm">Users & Roles</span>
+                        <svg class="w-4 h-4 text-gray-500 transition-transform duration-200 @(expandedGroups.Contains("admin-users") ? "rotate-180" : "")"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    }
+                </button>
+                @if (isSidebarExpanded && expandedGroups.Contains("admin-users"))
+                {
+                    <div class="pl-11 space-y-1">
+                        <a href="/admin/users"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">User Management</a>
+                        <a href="/admin/users/roles"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">Roles</a>
+                    </div>
+                }
+            </div>
+            }
+
+            @if (IsModuleVisible("reports"))
+            {
+            <!-- Reports Dropdown -->
+            <div class="space-y-1">
+                <button @onclick='() => ToggleGroup("admin-reports")'
+                    class="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative @(IsActive("/admin/reports") ? "bg-blue-600/10 text-blue-400" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-100")">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    @if (isSidebarExpanded)
+                    {
+                        <span class="flex-1 text-left font-medium truncate text-sm">Reports</span>
+                        <svg class="w-4 h-4 text-gray-500 transition-transform duration-200 @(expandedGroups.Contains("admin-reports") ? "rotate-180" : "")"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    }
+                </button>
+                @if (isSidebarExpanded && expandedGroups.Contains("admin-reports"))
+                {
+                    <div class="pl-11 space-y-1">
+                        <a href="/admin/reports"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">Performance</a>
+                        <a href="/admin/reports/sales"
+                            class="block py-2 text-sm text-gray-400 hover:text-white transition-colors">Sales</a>
+                    </div>
+                }
+            </div>
+            }
+
+            @if (IsModuleVisible("notifications"))
+            {
+            <!-- Notifications -->
+            <a href="/admin/notifications"
+                class="flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative @(IsActive("/admin/notifications") ? "bg-blue-600/10 text-blue-400" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-100")">
+                <div class="flex-shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                </div>
+                @if (isSidebarExpanded)
+                {
+                    <span class="font-medium truncate text-sm">Notifications</span>
+                }
+            </a>
+            }
+
+            @if (IsModuleVisible("integrations"))
+            {
+            <!-- Settings -->
+            <a href="/admin/settings"
+                class="flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative @(IsActive("/admin/settings") ? "bg-blue-600/10 text-blue-400" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-100")">
+                <div class="flex-shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </div>
+                @if (isSidebarExpanded)
+                {
+                    <span class="font-medium truncate text-sm">Settings</span>
+                }
+            </a>
+            }
+
+            @if (IsModuleVisible("notifications"))
+            {
+            <!-- Help / Support -->
+            <a href="/help"
+                class="flex items-center gap-3 px-3 py-3 rounded-lg transition-all group relative @(IsActive("/help") ? "bg-blue-600/10 text-blue-400" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-100")">
+                <div class="flex-shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                </div>
+                @if (isSidebarExpanded)
+                {
+                    <span class="font-medium truncate text-sm">Help / Support</span>
+                }
+            </a>
+            }
+
+        </nav>
+
+        <!-- Profile Footer -->
+        <div class="p-4 border-t border-white/5 bg-[#0B1120]">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-500/10 flex items-center justify-center flex-shrink-0 border border-violet-400/20 shadow-sm">
+                    <span class="text-xs font-bold text-violet-300">@(AuthService.CurrentUser?.FirstName?.FirstOrDefault() ?? 'A')@(AuthService.CurrentUser?.LastName?.FirstOrDefault() ?? 'D')</span>
+                </div>
+                @if (isSidebarExpanded)
+                {
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-white truncate">@(AuthService.CurrentUser?.FirstName ?? "Admin")</p>
+                        <p class="text-[10px] text-gray-400 truncate">@(AuthService.CurrentUser?.Role.ToString() ?? "Administrator")</p>
+                        <p class="text-[10px] text-violet-300/80 truncate">@currentBranchLabel</p>
+                    </div>
+                }
+                @if (isSidebarExpanded)
+                {
+                    <button @onclick="Logout" class="text-gray-400 hover:text-white transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </button>
+                }
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <!-- Top bar with hamburger -->
+        <header
+            class="admin-topbar h-14 shrink-0 flex items-center gap-4 px-4 lg:px-6 bg-white/95 backdrop-blur-sm border-b border-gray-200/60 shadow-sm z-20">
+            <button type="button" @onclick="OnHamburgerClick"
+                class="flex items-center justify-center w-10 h-10 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                aria-label="@(isSidebarExpanded ? "Collapse menu" : "Open menu")">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+            <div class="flex-1 min-w-0">
+                <span class="text-sm font-medium text-gray-500 truncate">Admin</span>
+            </div>
+            <span class="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                @currentBranchLabel
+            </span>
+        </header>
+        <!-- Page Content -->
+        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gradient-to-br from-[#F3F4F6] via-[#F3F4F6] to-violet-50/20">
+            @Body
+        </main>
+    </div>
+</div>
+
+<style>
+    /* Sidebar: desktop fixed width + smooth transition; mobile overlay */
+    .erp-main-container {
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+        gap: 0;
+    }
+
+    .admin-sidebar {
+        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        flex-shrink: 0;
+        position: relative;
+        z-index: 20;
+    }
+
+    .admin-sidebar.sidebar-expanded {
+        width: 18rem;
+        /* w-72 = 288px */
+    }
+
+    .admin-sidebar.sidebar-collapsed {
+        width: 4rem;
+        /* w-16 = 64px */
+    }
+
+    .admin-sidebar + .flex-1 {
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    @@media (min-width: 1024px) {
+        .admin-sidebar {
+            transition: width 0.3s ease;
+            position: relative;
+        }
+    }
+
+    @@media (max-width: 1023px) {
+        .admin-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            z-index: 40;
+            transition: transform 0.3s ease, width 0.3s ease;
+        }
+
+        .admin-sidebar.sidebar-collapsed {
+            transform: translateX(-100%);
+            width: 18rem;
+        }
+
+        .admin-sidebar.sidebar-expanded {
+            transform: translateX(0);
+        }
+    }
+
+    /* Custom Scrollbar */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+</style>
+
+@code {
+    private bool isSidebarExpanded = true;
+    private HashSet<string> expandedGroups = new HashSet<string>();
+    private ModuleAccessConfig? moduleAccessConfig;
+    private TenantSubscriptionModel? tenantSubscription;
+    private string currentBranchLabel = "Branch: Unassigned";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            moduleAccessConfig = await ApiClient.GetModuleAccessConfigAsync();
+            tenantSubscription = await ApiClient.GetMySubscriptionAsync();
+            await LoadBranchLabelAsync();
+        }
+        catch
+        {
+            // Keep layout responsive even when policy endpoints fail.
+            await LoadBranchLabelAsync();
+        }
+    }
+
+    private async Task LoadBranchLabelAsync()
+    {
+        try
+        {
+            var user = await ApiClient.GetCurrentUserAsync();
+            currentBranchLabel = await ResolveBranchLabelAsync(user);
+        }
+        catch
+        {
+            currentBranchLabel = await ResolveBranchLabelAsync(AuthService.CurrentUser);
+        }
+    }
+
+    private async Task<string> ResolveBranchLabelAsync(User? user)
+    {
+        if (user is null || user.BranchId is null || user.BranchId <= 0)
+        {
+            return "Branch: Unassigned";
+        }
+
+        var branchName = string.IsNullOrWhiteSpace(user.BranchName) ? null : user.BranchName.Trim();
+        if (branchName is null)
+        {
+            try
+            {
+                var users = await ApiClient.GetUsersAsync();
+                branchName = users?.FirstOrDefault(u => u.Id == user.Id)?.BranchName?.Trim();
+            }
+            catch
+            {
+            }
+        }
+
+        if (branchName is null)
+        {
+            try
+            {
+                var branches = await ApiClient.GetBranchesAsync();
+                branchName = branches?.FirstOrDefault(b => b.Id == user.BranchId.Value)?.Name?.Trim();
+            }
+            catch
+            {
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(branchName) ? "Branch: Unassigned" : $"Branch: {branchName}";
+    }
+
+    private string GetSidebarClass()
+    {
+        return isSidebarExpanded ? "sidebar-expanded" : "sidebar-collapsed";
+    }
+
+    private void OnHamburgerClick()
+    {
+        isSidebarExpanded = !isSidebarExpanded;
+        StateHasChanged();
+    }
+
+    private void ToggleGroup(string groupName)
+    {
+        if (expandedGroups.Contains(groupName))
+            expandedGroups.Remove(groupName);
+        else
+            expandedGroups.Add(groupName);
+        StateHasChanged();
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+    }
+
+    private bool IsActive(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return false;
+        try
+        {
+            var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            var absolutePath = "/" + relativePath.Split('?')[0].Trim('/');
+            var targetPath = "/" + path.Trim('/');
+
+            return absolutePath.Equals(targetPath, StringComparison.OrdinalIgnoreCase) ||
+            (targetPath != "/" && absolutePath.StartsWith(targetPath + "/", StringComparison.OrdinalIgnoreCase));
+        }
+        catch { return false; }
+    }
+
+    private bool IsModuleVisible(string moduleKey)
+    {
+        return IsAllowedForAdminRole(moduleKey) && IsAllowedBySubscription(moduleKey);
+    }
+
+    private bool IsAllowedForAdminRole(string moduleKey)
+    {
+        var module = moduleAccessConfig?.Modules.FirstOrDefault(m =>
+            string.Equals(m.ModuleKey, moduleKey, StringComparison.OrdinalIgnoreCase));
+
+        if (module == null)
+        {
+            // Fail-open to avoid hiding menus when config is temporarily unavailable.
+            return true;
+        }
+
+        return module.IsEnabled && module.RoleAccess.Admin;
+    }
+
+    private bool IsAllowedBySubscription(string moduleKey)
+    {
+        if (tenantSubscription == null || string.IsNullOrWhiteSpace(tenantSubscription.IncludedModulesCsv))
+        {
+            return true;
+        }
+
+        var rawTokens = tenantSubscription.IncludedModulesCsv
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToList();
+
+        if (rawTokens.Count == 0 || rawTokens.Any(t => t.Equals("All", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        var normalized = rawTokens
+            .Select(NormalizeIncludedModuleToken)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return normalized.Contains(moduleKey);
+    }
+
+    private static string NormalizeIncludedModuleToken(string token)
+    {
+        return token.Trim().ToLowerInvariant() switch
+        {
+            "dashboard" => "dashboard",
+            "users" or "iam" or "modulemanagement" => "iam",
+            "catalog" or "inventory" or "products" => "catalog",
+            "orders" or "returns" => "orders",
+            "tickets" or "support" => "tickets",
+            "calls" => "calls",
+            "customers" or "crm" => "customers",
+            "reports" or "analytics" or "financials" => "reports",
+            "audit" or "security" => "audit-security",
+            "integrations" or "erp" or "settings" => "integrations",
+            "notifications" or "help" => "notifications",
+            _ => token.Trim().ToLowerInvariant()
+        };
+    }
+
+    public void Dispose()
+    {
+    }
+}

@@ -1,0 +1,305 @@
+@page "/superadmin/my-profile"
+@using SupportSalesManagement.Frontend.Models
+@layout SuperAdminLayout
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject ApiClient ApiClient
+
+<PageTitle>My Profile - Super Admin</PageTitle>
+
+<div class="space-y-6">
+    <div class="bg-gradient-to-r from-blue-50 via-white to-violet-50 rounded-xl border border-blue-100 p-6 shadow-sm">
+        <h1 class="text-2xl font-bold text-gray-900">My Profile</h1>
+        <p class="text-sm text-gray-600 mt-1">Super Admin identity, access scope, and governance activity.</p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">@errorMessage</div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="bg-white rounded-xl border border-gray-200 p-6 text-sm text-gray-500">Loading profile...</div>
+    }
+    else if (currentUser != null)
+    {
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6 shadow-sm ui-surface-card">
+                <div class="flex items-start justify-between flex-wrap gap-4 mb-6">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 to-indigo-500 text-white font-bold flex items-center justify-center text-xl shadow-md">
+                            @GetInitials(currentUser)
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-900">@currentUser.FirstName @currentUser.LastName</h2>
+                            <p class="text-sm text-gray-500">@currentUser.Email</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">Super Admin</span>
+                        <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold @GetStatusBadgeClass(currentUser.IsActive)">
+                            @(currentUser.IsActive ? "Active Account" : "Inactive Account")
+                        </span>
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-indigo-100 p-5 bg-gradient-to-b from-indigo-50/70 to-white">
+                    <h3 class="text-sm font-bold text-gray-900 mb-4">Account Summary</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div class="rounded-lg border border-blue-100 p-4 bg-white">
+                            <p class="text-xs text-gray-500 uppercase font-semibold">Username</p>
+                            <p class="text-gray-900 font-medium mt-1">@(string.IsNullOrWhiteSpace(currentUser.Username) ? "Not Set" : currentUser.Username)</p>
+                        </div>
+                        <div class="rounded-lg border border-violet-100 p-4 bg-white">
+                            <p class="text-xs text-gray-500 uppercase font-semibold">Email</p>
+                            <p class="text-gray-900 font-medium mt-1">@currentUser.Email</p>
+                        </div>
+                        <div class="rounded-lg border border-emerald-100 p-4 bg-white">
+                            <p class="text-xs text-gray-500 uppercase font-semibold">Role</p>
+                            <p class="text-gray-900 font-medium mt-1">Super Admin</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 rounded-lg border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
+                    <h3 class="text-sm font-bold text-blue-900 mb-2">Authority Scope</h3>
+                    <ul class="text-sm text-blue-800 space-y-1">
+                        <li>- Full control over module enable/disable and role access assignment</li>
+                        <li>- Can manage users, privileged roles, and global security configuration</li>
+                        <li>- Can audit cross-system activity and enforce governance policies</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-gradient-to-b from-white to-blue-50/60 rounded-xl border border-blue-100 p-6 shadow-sm">
+                    <h3 class="text-sm font-bold text-gray-900 mb-3">Security</h3>
+                    <div class="space-y-3">
+                        <input @bind="currentPasswordInput" type="password" placeholder="Current password"
+                               class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                        <input @bind="newPasswordInput" type="password" placeholder="New password"
+                               class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                        <input @bind="confirmPasswordInput" type="password" placeholder="Confirm new password"
+                               class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                        <button type="button" @onclick="ChangePassword" disabled="@isUpdatingPassword"
+                                class="w-full px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                            @(isUpdatingPassword ? "Updating..." : "Change Password")
+                        </button>
+                        @if (!string.IsNullOrWhiteSpace(passwordMessage))
+                        {
+                            <p class="text-xs @(passwordSuccess ? "text-emerald-700" : "text-red-700")">@passwordMessage</p>
+                        }
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-b from-white to-violet-50/50 rounded-xl border border-violet-100 p-6 shadow-sm">
+                    <h3 class="text-sm font-bold text-gray-900 mb-3">Quick Links</h3>
+                    <div class="space-y-2 text-sm">
+                        <a href="/superadmin/module-management" class="block rounded-md border border-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-50">View Role Permission</a>
+                        <a href="/superadmin/settings" class="block rounded-md border border-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-50">System Setting</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm ui-surface-card">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900">Role Permissions Matrix</h3>
+                    <p class="text-xs text-gray-500 mt-1">Live matrix from module access configuration.</p>
+                </div>
+                <span class="text-xs text-gray-500">@((moduleConfig?.Modules.Count ?? 0)) modules</span>
+            </div>
+
+            @if (moduleConfig == null || moduleConfig.Modules.Count == 0)
+            {
+                <p class="text-sm text-gray-500">No module matrix available.</p>
+            }
+            else
+            {
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Module</th>
+                                <th class="px-4 py-2 text-center text-xs font-semibold text-gray-600 uppercase">Super Admin</th>
+                                <th class="px-4 py-2 text-center text-xs font-semibold text-gray-600 uppercase">Admin</th>
+                                <th class="px-4 py-2 text-center text-xs font-semibold text-gray-600 uppercase">Supervisor</th>
+                                <th class="px-4 py-2 text-center text-xs font-semibold text-gray-600 uppercase">Agent</th>
+                                <th class="px-4 py-2 text-center text-xs font-semibold text-gray-600 uppercase">Customer</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach (var module in moduleConfig.Modules.OrderBy(m => m.Category).ThenBy(m => m.DisplayName))
+                            {
+                                <tr>
+                                    <td class="px-4 py-2">
+                                        <p class="font-semibold text-gray-900 text-sm">@module.DisplayName</p>
+                                        <p class="text-[11px] text-gray-500">@module.Category</p>
+                                    </td>
+                                    <td class="px-4 py-2 text-center">@RenderAccessBadge(module.IsEnabled && module.RoleAccess.SuperAdmin)</td>
+                                    <td class="px-4 py-2 text-center">@RenderAccessBadge(module.IsEnabled && module.RoleAccess.Admin)</td>
+                                    <td class="px-4 py-2 text-center">@RenderAccessBadge(module.IsEnabled && module.RoleAccess.Supervisor)</td>
+                                    <td class="px-4 py-2 text-center">@RenderAccessBadge(module.IsEnabled && module.RoleAccess.Agent)</td>
+                                    <td class="px-4 py-2 text-center">@RenderAccessBadge(module.IsEnabled && module.RoleAccess.Customer)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <div class="bg-gradient-to-b from-white to-slate-50 rounded-xl border border-gray-200 p-6 shadow-sm ui-surface-card">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-900">Recent Administrative Activity</h3>
+                <a href="/superadmin/audit" class="text-sm font-semibold text-blue-600 hover:text-blue-700">View Full Audit →</a>
+            </div>
+            @if (recentAuditLogs.Count == 0)
+            {
+                <p class="text-sm text-gray-500">No recent actions found.</p>
+            }
+            else
+            {
+                <div class="space-y-3">
+                    @foreach (var log in recentAuditLogs)
+                    {
+                        <div class="rounded-lg border border-gray-100 p-3 bg-gray-50">
+                            <div class="flex items-center justify-between gap-3">
+                                <p class="text-sm font-semibold text-gray-900">@log.Action</p>
+                                <span class="text-xs text-gray-500">@log.Timestamp.ToString("MMM dd, yyyy HH:mm")</span>
+                            </div>
+                            <p class="text-xs text-gray-600 mt-1">@log.Description</p>
+                            <p class="text-[11px] text-gray-500 mt-1">Actor: @log.UserEmail</p>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private User? currentUser;
+    private SystemStats? stats;
+    private List<AuditLog> recentAuditLogs = new();
+    private ModuleAccessConfig? moduleConfig;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string currentPasswordInput = string.Empty;
+    private string newPasswordInput = string.Empty;
+    private string confirmPasswordInput = string.Empty;
+    private bool isUpdatingPassword;
+    private string? passwordMessage;
+    private bool passwordSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var currentUserTask = ApiClient.GetCurrentUserAsync();
+            var statsTask = ApiClient.GetSuperAdminStatsAsync();
+            var logsTask = ApiClient.GetAuditLogsAsync();
+            var moduleTask = ApiClient.GetModuleAccessConfigAsync();
+            await Task.WhenAll(currentUserTask, statsTask, logsTask, moduleTask);
+
+            currentUser = await currentUserTask;
+            stats = await statsTask;
+            var logs = await logsTask ?? new List<AuditLog>();
+            moduleConfig = await moduleTask;
+
+            if (currentUser == null)
+            {
+                errorMessage = "Unable to load your profile.";
+                return;
+            }
+
+            recentAuditLogs = logs
+                .Where(x => string.Equals(x.UserEmail, currentUser.Email, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x => x.Timestamp)
+                .Take(5)
+                .ToList();
+
+            if (recentAuditLogs.Count == 0)
+            {
+                recentAuditLogs = logs
+                    .OrderByDescending(x => x.Timestamp)
+                    .Take(5)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load profile: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string GetInitials(User user)
+    {
+        var first = string.IsNullOrWhiteSpace(user.FirstName) ? "S" : user.FirstName[0].ToString().ToUpperInvariant();
+        var last = string.IsNullOrWhiteSpace(user.LastName) ? "A" : user.LastName[0].ToString().ToUpperInvariant();
+        return $"{first}{last}";
+    }
+
+    private static string GetStatusBadgeClass(bool isActive)
+    {
+        return isActive
+            ? "bg-emerald-50 text-emerald-700"
+            : "bg-red-50 text-red-700";
+    }
+
+    private async Task ChangePassword()
+    {
+        passwordMessage = null;
+        passwordSuccess = false;
+
+        if (currentUser == null)
+        {
+            passwordMessage = "Unable to resolve current user.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentPasswordInput) || string.IsNullOrWhiteSpace(newPasswordInput) || string.IsNullOrWhiteSpace(confirmPasswordInput))
+        {
+            passwordMessage = "Please complete all password fields.";
+            return;
+        }
+
+        if (!string.Equals(newPasswordInput, confirmPasswordInput, StringComparison.Ordinal))
+        {
+            passwordMessage = "New password and confirmation do not match.";
+            return;
+        }
+
+        isUpdatingPassword = true;
+        try
+        {
+            var result = await ApiClient.ChangePasswordAsync(currentUser.Id, currentPasswordInput, newPasswordInput);
+            passwordSuccess = result.Success;
+            passwordMessage = result.Message;
+
+            if (result.Success)
+            {
+                currentPasswordInput = string.Empty;
+                newPasswordInput = string.Empty;
+                confirmPasswordInput = string.Empty;
+            }
+        }
+        finally
+        {
+            isUpdatingPassword = false;
+        }
+    }
+
+    private static MarkupString RenderAccessBadge(bool allowed)
+    {
+        var html = allowed
+            ? "<span class='inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700'>Allowed</span>"
+            : "<span class='inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-600'>Blocked</span>";
+        return new MarkupString(html);
+    }
+}

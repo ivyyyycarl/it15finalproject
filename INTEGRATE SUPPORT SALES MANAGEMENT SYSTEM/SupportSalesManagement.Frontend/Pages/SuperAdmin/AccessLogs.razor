@@ -1,0 +1,10 @@
+@page "/superadmin/security/access-logs"
+@layout SuperAdminLayout
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.NavigateTo("/superadmin/audit", replace: true);
+    }
+}

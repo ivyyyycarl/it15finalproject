@@ -1,0 +1,462 @@
+@page "/admin/tickets"
+@page "/admin/tickets/escalated"
+@page "/admin/tickets/assign"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Admin - Ticket Management</PageTitle>
+
+<div class="px-6 py-8">
+    <div class="mb-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Support Tickets</h1>
+            <p class="mt-1 text-sm text-gray-500">Manage customer inquiries and agent assignments</p>
+        </div>
+        <div class="flex space-x-3">
+             <button @onclick='() => NavigationManager.NavigateTo("/admin/tickets/reports")'
+                class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-4 rounded-lg shadow-sm">
+                Ticket Reports
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="mb-4 rounded-lg border px-4 py-3 text-sm @(isError ? "bg-red-50 border-red-200 text-red-700" : "bg-green-50 border-green-200 text-green-700")">
+            @statusMessage
+        </div>
+    }
+
+    <!-- View Tabs -->
+    <div class="flex items-center gap-6 border-b border-gray-200 mb-6">
+        <button
+            class="pb-3 px-1 font-bold text-sm transition-all relative @(ActiveTab == "All" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")"
+            @onclick='() => SetTab("All")'>
+            All Tickets
+            @if(ActiveTab == "All") { <span class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span> }
+        </button>
+        <button
+            class="pb-3 px-1 font-bold text-sm transition-all relative @(ActiveTab == "Escalated" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")"
+            @onclick='() => SetTab("Escalated")'>
+            Escalated / Critical
+            @if(ActiveTab == "Escalated") { <span class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span> }
+        </button>
+        <button
+            class="pb-3 px-1 font-bold text-sm transition-all relative @(ActiveTab == "Unassigned" ? "text-blue-600" : "text-gray-500 hover:text-gray-700")"
+            @onclick='() => SetTab("Unassigned")'>
+            Unassigned
+            @if(ActiveTab == "Unassigned") { <span class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span> }
+        </button>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div class="flex items-center">
+                <div class="p-3 bg-blue-100 rounded-lg text-blue-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Total Tickets</p>
+                    <p class="text-2xl font-semibold text-gray-900">@tickets.Count</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div class="flex items-center">
+                <div class="p-3 bg-yellow-100 rounded-lg text-yellow-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Pending</p>
+                    <p class="text-2xl font-semibold text-gray-900">@tickets.Count(t => t.Status == "Pending" || t.Status == "Open")</p>
+                </div>
+            </div>
+        </div>
+         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div class="flex items-center">
+                <div class="p-3 bg-red-100 rounded-lg text-red-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Critical</p>
+                    <p class="text-2xl font-semibold text-gray-900">@tickets.Count(t => t.Priority == "High" || t.Priority == "Critical")</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div class="flex items-center">
+                <div class="p-3 bg-green-100 rounded-lg text-green-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Resolved</p>
+                    <p class="text-2xl font-semibold text-gray-900">@tickets.Count(t => t.Status == "Resolved" || t.Status == "Closed")</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search/Filter -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="md:col-span-2">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
+                    <input type="text" @bind="searchTerm" @bind:event="oninput" @bind:after="FilterTickets"
+                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                        placeholder="Search tickets..." />
+                </div>
+            </div>
+            <div>
+                 <select @bind="statusFilter" @bind:after="FilterTickets"
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">All Statuses</option>
+                    <option value="Open">Open</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Closed">Closed</option>
+                </select>
+            </div>
+            <div>
+                <select @bind="priorityFilter" @bind:after="FilterTickets"
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">All Priorities</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        @if (isLoading)
+        {
+            <div class="p-12 flex justify-center">
+                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+            </div>
+        }
+        else if (filteredTickets.Count == 0)
+        {
+            <div class="p-12 text-center text-gray-500">
+                <p>No tickets found matching your search.</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket Info</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Agent</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @foreach (var ticket in pagedFilteredTickets)
+                        {
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center">
+                                         <div class="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-bold">
+                                            #@ticket.Id
+                                        </div>
+                                        <div class="ml-4">
+                                            <div class="text-sm font-medium text-gray-900">@ticket.Title</div>
+                                            <div class="text-sm text-gray-500">@ticket.Category • @ticket.CreatedAt.ToString("MMM dd")</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">@(string.IsNullOrEmpty(ticket.CustomerName) ? $"Customer #{ticket.CustomerId}" : ticket.CustomerName)</div>
+                                </td>
+                                 <td class="px-6 py-4 whitespace-nowrap">
+                                    @if(ticket.AssignedAgentId.HasValue)
+                                    {
+                                        <div class="flex items-center">
+                                            <img class="h-6 w-6 rounded-full bg-gray-300" src="https://ui-avatars.com/api/?name=Agent+@ticket.AssignedAgentId&background=random" alt="" />
+                                            <span class="ml-2 text-sm text-gray-900">Agent @ticket.AssignedAgentId</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                            Unassigned
+                                        </span>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full @GetPriorityClass(ticket.Priority)">
+                                        @ticket.Priority
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full @GetStatusClass(ticket.Status)">
+                                        @ticket.Status
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <a href="@($"/admin/tickets/{ticket.Id}")" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+                                    @if(!ticket.AssignedAgentId.HasValue)
+                                    {
+                                        <button type="button" @onclick='() => AssignTicket(ticket)' disabled="@isAssigning" class="text-indigo-600 hover:text-indigo-900 disabled:opacity-50">
+                                            @(isAssigning ? "Assigning..." : "Assign")
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <p class="text-sm text-gray-600">
+                        Showing @(((currentPage - 1) * pageSize) + 1)-@Math.Min(currentPage * pageSize, filteredTickets.Count) of @filteredTickets.Count · Page @currentPage/@totalPages
+                    </p>
+                <div class="flex items-center gap-2">
+                        <button type="button" @onclick="PreviousPage" disabled="@(currentPage <= 1)"
+                                class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                        <button type="button" @onclick="NextPage" disabled="@(currentPage >= totalPages)"
+                                class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Ticket> tickets = new();
+    private List<Ticket> filteredTickets = new();
+    private bool isLoading = true;
+    private bool isAssigning = false;
+    private string statusMessage = string.Empty;
+    private bool isError = false;
+    private List<User> agents = new();
+
+    // Filters
+    private string searchTerm = "";
+    private string statusFilter = "";
+    private string priorityFilter = "";
+    private string ActiveTab = "All"; // All, Escalated, Unassigned
+    private int currentPage = 1;
+    private const int pageSize = 25;
+    private int totalPages => Math.Max(1, (int)Math.Ceiling(filteredTickets.Count / (double)pageSize));
+    private List<Ticket> pagedFilteredTickets => filteredTickets
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    protected override void OnParametersSet()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).ToLower();
+
+        if (relativePath.Contains("escalated"))
+        {
+            SetTab("Escalated", false);
+        }
+        else if (relativePath.Contains("assign"))
+        {
+            SetTab("Unassigned", false);
+        }
+        else
+        {
+             // Default or ensure correct state if navigating back
+             if(ActiveTab == "Escalated" || ActiveTab == "Unassigned")
+             {
+                 SetTab("All", false);
+             }
+        }
+    }
+
+    private void SetTab(string tab, bool updateUrl = true)
+    {
+        ActiveTab = tab;
+        
+        // Reset filters when switching tabs if desired, or keep them
+        if (tab == "Escalated")
+        {
+            // priorityFilter = "Critical"; // Optional: Force filter
+        }
+        else if(tab == "Unassigned")
+        {
+             // statusFilter = "Open"; // Optional
+        }
+
+        FilterTickets();
+        currentPage = 1;
+
+        if (updateUrl)
+        {
+            if (tab == "Escalated") NavigationManager.NavigateTo("/admin/tickets/escalated");
+            else if (tab == "Unassigned") NavigationManager.NavigateTo("/admin/tickets/assign");
+            else NavigationManager.NavigateTo("/admin/tickets");
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await ApiClient.GetTicketsAsync();
+            if (result != null)
+            {
+                tickets = result;
+                FilterTickets();
+            }
+
+            var users = await ApiClient.GetUsersAsync();
+            agents = users?
+                .Where(u => u.Role == UserRole.Agent && u.IsActive)
+                .ToList() ?? new List<User>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading tickets: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void FilterTickets()
+    {
+        var query = tickets.AsEnumerable();
+
+        // 1. Tab Logic
+        if (ActiveTab == "Escalated")
+        {
+            query = query.Where(t => t.Priority == "Critical" || t.Priority == "High" || t.Status == "Escalated");
+        }
+        else if (ActiveTab == "Unassigned")
+        {
+            query = query.Where(t => !t.AssignedAgentId.HasValue);
+        }
+
+        // 2. Search Filter
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            query = query.Where(t => 
+                t.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+                t.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                (t.CustomerName != null && t.CustomerName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            );
+        }
+
+        // 3. Status Filter
+        if (!string.IsNullOrWhiteSpace(statusFilter))
+        {
+            query = query.Where(t => t.Status.Equals(statusFilter, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        // 4. Priority Filter
+        if (!string.IsNullOrWhiteSpace(priorityFilter))
+        {
+            query = query.Where(t => t.Priority.Equals(priorityFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        filteredTickets = query.OrderByDescending(t => t.Priority == "Critical").ThenByDescending(t => t.CreatedAt).ToList();
+        currentPage = 1;
+    }
+
+    private void PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage >= totalPages) return;
+        currentPage++;
+    }
+
+    private async Task AssignTicket(Ticket ticket)
+    {
+        if (isAssigning) return;
+
+        statusMessage = string.Empty;
+        isError = false;
+        isAssigning = true;
+        try
+        {
+            if (!agents.Any())
+            {
+                statusMessage = "No active agents available for assignment.";
+                isError = true;
+                return;
+            }
+
+            var targetAgent = agents
+                .OrderBy(a => tickets.Count(t => t.AssignedAgentId == a.Id && t.Status != "Resolved" && t.Status != "Closed"))
+                .ThenBy(a => a.Id)
+                .First();
+
+            var success = await ApiClient.AssignTicketAsync(ticket.Id, targetAgent.Id);
+            if (!success)
+            {
+                statusMessage = "Failed to assign ticket. Please try again.";
+                isError = true;
+                return;
+            }
+
+            ticket.AssignedAgentId = targetAgent.Id;
+            ticket.AssignedTo = targetAgent.Name;
+            statusMessage = $"Ticket #{ticket.Id} assigned to {targetAgent.Name}.";
+            FilterTickets();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Assignment error: {ex.Message}";
+            isError = true;
+        }
+        finally
+        {
+            isAssigning = false;
+        }
+    }
+
+    private string GetPriorityClass(string priority)
+    {
+        return priority?.ToLower() switch
+        {
+            "critical" => "bg-red-100 text-red-800",
+            "high" => "bg-orange-100 text-orange-800",
+            "medium" => "bg-yellow-100 text-yellow-800",
+            "low" => "bg-green-100 text-green-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status?.ToLower() switch
+        {
+            "open" => "bg-blue-100 text-blue-800",
+            "pending" => "bg-yellow-100 text-yellow-800",
+            "resolved" => "bg-green-100 text-green-800",
+            "closed" => "bg-gray-100 text-gray-800",
+             _ => "bg-gray-100 text-gray-800"
+        };
+    }
+}

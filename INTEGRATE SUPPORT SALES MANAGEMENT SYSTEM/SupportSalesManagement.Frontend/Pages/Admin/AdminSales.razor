@@ -1,0 +1,258 @@
+@page "/admin/sales"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Services
+@using SupportSalesManagement.Frontend.Models
+@inject ApiClient ApiClient
+
+<PageTitle>Sales Overview - Admin</PageTitle>
+
+<div class="space-y-6 p-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Sales Overview</h1>
+            <p class="text-gray-500">Performance metrics and order analytics.</p>
+        </div>
+        <select @bind="selectedStatus" @bind:after="ApplyFilter"
+            class="border border-gray-200 rounded-lg px-4 py-2 text-gray-700 bg-white focus:ring-2 focus:ring-classic-teal outline-none">
+            <option value="">All Statuses</option>
+            @foreach (var status in allStatuses)
+            {
+                <option value="@status">@status</option>
+            }
+        </select>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 flex items-center justify-center">
+            <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-classic-teal mb-4"></div>
+                <p class="text-gray-500">Loading sales data...</p>
+            </div>
+        </div>
+    }
+    else if (errorMessage is not null)
+    {
+        <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+            <svg class="w-10 h-10 text-red-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-red-700 font-medium mb-1">Failed to load sales data</p>
+            <p class="text-red-500 text-sm mb-4">@errorMessage</p>
+            <button @onclick="LoadDataAsync"
+                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium">
+                Retry
+            </button>
+        </div>
+    }
+    else
+    {
+        <!-- Summary Stats Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                    </div>
+                    <p class="text-sm font-medium text-gray-500">Total Orders</p>
+                </div>
+                <p class="text-3xl font-bold text-gray-900">@filteredOrders.Count</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <p class="text-sm font-medium text-gray-500">Total Revenue</p>
+                </div>
+                <p class="text-3xl font-bold text-gray-900">@TotalRevenue.ToString("C")</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                    </div>
+                    <p class="text-sm font-medium text-gray-500">Avg Order Value</p>
+                </div>
+                <p class="text-3xl font-bold text-gray-900">@AverageOrderValue.ToString("C")</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                    </div>
+                    <p class="text-sm font-medium text-gray-500">Total Products</p>
+                </div>
+                <p class="text-3xl font-bold text-gray-900">@products.Count</p>
+            </div>
+        </div>
+
+        <!-- Orders by Status Breakdown -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h2 class="text-lg font-bold text-gray-900 mb-4">Orders by Status</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                @foreach (var group in statusBreakdown)
+                {
+                    <div class="text-center p-3 rounded-lg bg-gray-50">
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold mb-2 @GetStatusBadgeClass(group.Key)">
+                            @group.Key
+                        </span>
+                        <p class="text-2xl font-bold text-gray-900">@group.Value</p>
+                        <p class="text-xs text-gray-500">orders</p>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-bold text-gray-900">Orders</h2>
+                <p class="text-sm text-gray-500">@filteredOrders.Count order(s)</p>
+            </div>
+
+            @if (filteredOrders.Count == 0)
+            {
+                <div class="p-12 text-center">
+                    <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <p class="text-gray-500 font-medium">No orders found</p>
+                    <p class="text-gray-400 text-sm mt-1">Try changing the status filter.</p>
+                </div>
+            }
+            else
+            {
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Order #</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Customer</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            @foreach (var order in filteredOrders)
+                            {
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-classic-teal">
+                                        @(string.IsNullOrEmpty(order.OrderNumber) ? $"#{order.Id}" : order.OrderNumber)
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        @(string.IsNullOrEmpty(order.CustomerName) ? $"Customer #{order.CustomerId}" : order.CustomerName)
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        @order.OrderDate.ToString("MMM dd, yyyy h:mm tt")
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                                        @order.TotalAmount.ToString("C")
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full @GetStatusBadgeClass(order.Status)">
+                                            @order.Status
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Order> allOrders = new();
+    private List<Order> filteredOrders = new();
+    private List<Product> products = new();
+    private Dictionary<string, int> statusBreakdown = new();
+    private List<string> allStatuses = new();
+    private string selectedStatus = "";
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    private decimal TotalRevenue => filteredOrders.Sum(o => o.TotalAmount);
+    private decimal AverageOrderValue => filteredOrders.Count > 0 ? TotalRevenue / filteredOrders.Count : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var ordersTask = ApiClient.GetOrdersAsync();
+            var productsTask = ApiClient.GetProductsAsync();
+
+            await Task.WhenAll(ordersTask, productsTask);
+
+            allOrders = ordersTask.Result ?? new();
+            products = productsTask.Result ?? new();
+
+            allStatuses = allOrders
+                .Select(o => o.Status)
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList();
+
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        filteredOrders = string.IsNullOrEmpty(selectedStatus)
+            ? allOrders.OrderByDescending(o => o.OrderDate).ToList()
+            : allOrders.Where(o => o.Status == selectedStatus).OrderByDescending(o => o.OrderDate).ToList();
+
+        statusBreakdown = allOrders
+            .GroupBy(o => string.IsNullOrEmpty(o.Status) ? "Unknown" : o.Status)
+            .OrderByDescending(g => g.Count())
+            .ToDictionary(g => g.Key, g => g.Count());
+    }
+
+    private string GetStatusBadgeClass(string status) => status?.ToLower() switch
+    {
+        "completed" or "delivered" => "bg-green-100 text-green-800",
+        "processing" or "shipped" => "bg-blue-100 text-blue-800",
+        "pending" => "bg-yellow-100 text-yellow-800",
+        "cancelled" or "refunded" => "bg-red-100 text-red-800",
+        _ => "bg-gray-100 text-gray-800"
+    };
+}

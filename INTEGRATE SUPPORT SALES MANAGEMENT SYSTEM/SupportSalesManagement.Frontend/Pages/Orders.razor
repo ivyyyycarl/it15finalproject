@@ -1,0 +1,676 @@
+@page "/orders"
+@page "/admin/orders"
+@page "/orders/{orderId:int}"
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+@using SupportSalesManagement.Frontend.Models
+@using CustomerModel = SupportSalesManagement.Frontend.Models.Customer
+@using SupportSalesManagement.Frontend.Services
+@using Microsoft.AspNetCore.Components
+
+<PageTitle>Orders</PageTitle>
+
+<div class="px-4 py-6 sm:px-0">
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white @(isSuccess ? "bg-green-600" : "bg-red-600") transition-all duration-300">
+            <div class="flex items-center gap-2">
+                <span>@statusMessage</span>
+                <button @onclick="() => statusMessage = null" class="ml-2 text-white/80 hover:text-white">&times;</button>
+            </div>
+        </div>
+    }
+
+    <div class="mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Sales Orders</h1>
+                <p class="mt-1 text-sm text-gray-600">Manage customer orders and track sales</p>
+            </div>
+            <button @onclick="ShowCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md">
+                Create Order
+            </button>
+        </div>
+    </div>
+
+    <div id="refund-requests" class="bg-white shadow rounded-lg mb-6 p-4 border @(focusSection == "refunds" ? "border-rose-300 ring-1 ring-rose-200" : "border-rose-100")">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-base font-semibold text-rose-700">Pending Refund Requests</h2>
+            <span class="text-xs font-semibold px-2 py-1 rounded-full bg-rose-50 text-rose-700">@pendingRefundRequests.Count</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-rose-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Order #</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Requested By</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Reason</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Date</th>
+                        <th class="px-3 py-2 text-right text-xs font-semibold text-gray-700 uppercase">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @if (pendingRefundRequests.Any())
+                    {
+                        @foreach (var request in pendingRefundRequests.Take(8))
+                        {
+                            <tr>
+                                <td class="px-3 py-2 text-sm font-medium text-gray-900">@request.OrderNumber</td>
+                                <td class="px-3 py-2 text-sm text-gray-700">@request.RequestedByName</td>
+                                <td class="px-3 py-2 text-sm text-gray-700">@(!string.IsNullOrWhiteSpace(request.Reason) ? request.Reason : "-")</td>
+                                <td class="px-3 py-2 text-sm text-gray-500">@request.CreatedAt.ToString("MMM dd, yyyy HH:mm")</td>
+                                <td class="px-3 py-2 text-right">
+                                    <button @onclick="() => ApproveRefundByRequest(request)" class="text-rose-600 hover:text-rose-900 text-sm font-semibold">Approve</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="px-3 py-4 text-sm text-gray-500 text-center">No pending refund requests.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white shadow rounded-lg mb-6 p-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select @bind="selectedStatus" @bind:after="FilterOrders" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">All Status</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Processing">Processing</option>
+                    <option value="Shipped">Shipped</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
+                    <option value="Refunded">Refunded</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+                <select @bind="dateRange" @bind:after="FilterOrders" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <input type="text" value="@searchTerm" @oninput="OnSearchInput" placeholder="Search orders..." 
+                       class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+            </div>
+            <div class="flex items-end">
+                <button @onclick="FilterOrders" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md w-full">
+                    Apply Filters
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders List -->
+    <div class="bg-white shadow rounded-lg">
+        @if (isLoading)
+        {
+            <div class="p-8 text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <p class="mt-2 text-gray-600">Loading orders...</p>
+            </div>
+        }
+        else if (filteredOrders == null || filteredOrders.Count == 0)
+        {
+            <div class="p-8 text-center">
+                <p class="text-gray-600">No orders found</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("orderNumber")' class="inline-flex items-center gap-1 hover:text-indigo-600">
+                                    Order # <span class="text-[10px]">@GetSortIndicator("orderNumber")</span>
+                                </button>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("customerName")' class="inline-flex items-center gap-1 hover:text-indigo-600">
+                                    Customer <span class="text-[10px]">@GetSortIndicator("customerName")</span>
+                                </button>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("orderDate")' class="inline-flex items-center gap-1 hover:text-indigo-600">
+                                    Date <span class="text-[10px]">@GetSortIndicator("orderDate")</span>
+                                </button>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("totalAmount")' class="inline-flex items-center gap-1 hover:text-indigo-600">
+                                    Total <span class="text-[10px]">@GetSortIndicator("totalAmount")</span>
+                                </button>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("status")' class="inline-flex items-center gap-1 hover:text-indigo-600">
+                                    Status <span class="text-[10px]">@GetSortIndicator("status")</span>
+                                </button>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @foreach (var order in filteredOrders)
+                        {
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">@order.OrderNumber</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @(string.IsNullOrEmpty(order.CustomerName) ? (order.Customer != null ? $"{order.Customer.FirstName} {order.Customer.LastName}" : $"Customer #{order.CustomerId}") : order.CustomerName)
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @order.OrderDate.ToString("MMM dd, yyyy")
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    ₱@order.TotalAmount.ToString("F2")
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium @(GetStatusColor(order.Status))">
+                                        @order.Status
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @order.OrderDetails.Count
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button @onclick="() => ViewOrder(order.Id)" class="text-indigo-600 hover:text-indigo-900 mr-3">View</button>
+                                    <button @onclick="() => EditOrder(order)" class="text-gray-600 hover:text-gray-900">Edit</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                <p class="text-sm text-gray-500">Showing @(filteredOrders.Any() ? (((currentPage - 1) * pageSize) + 1) : 0)-@Math.Min(currentPage * pageSize, totalOrderCount) of @totalOrderCount orders · Page @currentPage/@totalPages</p>
+                <div class="flex items-center gap-2">
+                    <button @onclick="PreviousPage" disabled="@(currentPage <= 1 || OrderId.HasValue)"
+                        class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        Previous
+                    </button>
+                    <button @onclick="NextPage" disabled="@(currentPage >= totalPages || OrderId.HasValue)"
+                        class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        Next
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+@if (showModal)
+{
+    <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white max-h-screen overflow-y-auto">
+            <div class="mt-3">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                    @(editingOrder != null ? "Edit Order" : "Create New Order")
+                </h3>
+                
+                <form @onsubmit="SaveOrder">
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Customer</label>
+                                <select @bind="orderForm.CustomerId" required
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="">Select Customer</option>
+                                    @if (customers != null)
+                                    {
+                                        @foreach (var customer in customers)
+                                        {
+                                            <option value="@customer.Id">@customer.FirstName @customer.LastName - @customer.Company</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            
+                            @if (editingOrder != null)
+                            {
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Status</label>
+                                    <select @bind="updateForm.Status"
+                                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="Pending">Pending</option>
+                                        <option value="Processing">Processing</option>
+                                        <option value="Completed">Completed</option>
+                                        <option value="Cancelled">Cancelled</option>
+                                        <option value="Refunded">Refunded</option>
+                                    </select>
+                                </div>
+                            }
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Order Items</label>
+                            <div class="space-y-3">
+                                @for (int i = 0; i < orderForm.OrderDetails.Count; i++)
+                                {
+                                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                                        <div class="md:col-span-2">
+                                            <label class="block text-xs font-medium text-gray-700">Product</label>
+                                            <select @bind="orderForm.OrderDetails[i].ProductId" 
+                                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                                <option value="">Select Product</option>
+                                                @if (products != null)
+                                                {
+                                                    @foreach (var product in products.Where(p => p.IsActive))
+                                                    {
+                                                        <option value="@product.Id">@product.Name - ₱@product.Price.ToString("F2")</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-700">Quantity</label>
+                                            <input type="number" @bind="orderForm.OrderDetails[i].Quantity" min="1"
+                                                   class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-700">Unit Price</label>
+                                            <input type="number" @bind="orderForm.OrderDetails[i].UnitPrice" step="0.01" min="0"
+                                                   class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                                        </div>
+                                        <div>
+                                            <button type="button" @onclick="() => RemoveOrderItem(i)" 
+                                                    class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md w-full">
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            
+                            <button type="button" @onclick="AddOrderItem" 
+                                    class="mt-3 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md">
+                                Add Item
+                            </button>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Notes</label>
+                            <textarea @bind="orderForm.Notes" rows="3"
+                                      class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-4 rounded-md">
+                            <div class="flex justify-between items-center">
+                                <span class="text-lg font-medium text-gray-900">Order Total:</span>
+                                <span class="text-2xl font-bold text-indigo-600">₱@CalculateOrderTotal().ToString("F2")</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button type="button" @onclick="HideModal" 
+                                class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-4 rounded-md">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled="@isSaving"
+                                class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50">
+                            @(isSaving ? "Saving..." : "Save Order")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Order> orders = new();
+    private List<Order> filteredOrders = new();
+    private List<CustomerModel> customers = new();
+    private List<Product> products = new();
+    private List<PendingRefundRequest> pendingRefundRequests = new();
+    private Order? editingOrder;
+    private CreateOrderRequest orderForm = new();
+    private UpdateOrderRequest updateForm = new();
+    private string selectedStatus = "";
+    private string dateRange = "";
+    private string searchTerm = "";
+    private bool isLoading = true;
+    private bool showModal = false;
+    private bool isSaving = false;
+    private string? statusMessage;
+    private bool isSuccess;
+    private int currentPage = 1;
+    private int pageSize = 25;
+    private int totalPages = 1;
+    private int totalOrderCount = 0;
+    private string sortBy = "createdAt";
+    private string sortDir = "desc";
+    private CancellationTokenSource? _searchDebounceCts;
+
+    [Parameter]
+    public int? OrderId { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "focus")]
+    public string? focusSection { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (OrderId.HasValue && orders.Any())
+        {
+            filteredOrders = orders.Where(o => o.Id == OrderId.Value).ToList();
+        }
+        else if (orders.Any())
+        {
+            filteredOrders = orders;
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            if (OrderId.HasValue)
+            {
+                var singleOrder = await ApiClient.GetOrderAsync(OrderId.Value);
+                orders = singleOrder != null ? new List<Order> { singleOrder } : new List<Order>();
+                totalOrderCount = orders.Count;
+                totalPages = 1;
+            }
+            else
+            {
+                var (dateFrom, dateTo) = GetDateRange();
+                var pagedOrders = await ApiClient.GetOrdersPagedAsync(
+                    currentPage,
+                    pageSize,
+                    status: string.IsNullOrWhiteSpace(selectedStatus) ? null : selectedStatus,
+                    search: string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm,
+                    dateFrom: dateFrom,
+                    dateTo: dateTo,
+                    sortBy: sortBy,
+                    sortDir: sortDir);
+                orders = pagedOrders?.Items ?? new List<Order>();
+                totalOrderCount = pagedOrders?.TotalCount ?? orders.Count;
+                totalPages = Math.Max(1, pagedOrders?.TotalPages ?? 1);
+            }
+
+            customers = (await ApiClient.GetCustomersAsync()) ?? new List<CustomerModel>();
+            products = (await ApiClient.GetActiveProductsAsync()) ?? new List<Product>();
+            pendingRefundRequests = (await ApiClient.GetPendingRefundRequestsAsync()) ?? new List<PendingRefundRequest>();
+            
+            if (OrderId.HasValue)
+            {
+                filteredOrders = orders.Where(o => o.Id == OrderId.Value).ToList();
+            }
+            else
+            {
+                filteredOrders = orders;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading orders: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task FilterOrders()
+    {
+        currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task SetSort(string field)
+    {
+        if (string.Equals(sortBy, field, StringComparison.OrdinalIgnoreCase))
+        {
+            sortDir = sortDir == "asc" ? "desc" : "asc";
+        }
+        else
+        {
+            sortBy = field;
+            sortDir = "asc";
+        }
+
+        await FilterOrders();
+    }
+
+    private string GetSortIndicator(string field)
+    {
+        if (!string.Equals(sortBy, field, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return sortDir == "asc" ? "ASC" : "DESC";
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? string.Empty;
+        await DebouncedFilterOrdersAsync();
+    }
+
+    private async Task DebouncedFilterOrdersAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (token.IsCancellationRequested) return;
+            await FilterOrders();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private (DateTime? From, DateTime? To) GetDateRange()
+    {
+        if (string.IsNullOrEmpty(dateRange))
+        {
+            return (null, null);
+        }
+
+        var today = DateTime.Today;
+        return dateRange switch
+        {
+            "today" => (today, today.AddDays(1).AddTicks(-1)),
+            "week" => (today.AddDays(-7), DateTime.Now),
+            "month" => (today.AddDays(-30), DateTime.Now),
+            _ => (null, null)
+        };
+    }
+
+    private async Task PreviousPage()
+    {
+        if (OrderId.HasValue || currentPage <= 1) return;
+        currentPage--;
+        await LoadData();
+    }
+
+    private async Task NextPage()
+    {
+        if (OrderId.HasValue || currentPage >= totalPages) return;
+        currentPage++;
+        await LoadData();
+    }
+
+    private void ShowCreateModal()
+    {
+        editingOrder = null;
+        orderForm = new CreateOrderRequest { OrderDetails = new List<CreateOrderDetailRequest>() };
+        updateForm = new UpdateOrderRequest();
+        showModal = true;
+    }
+
+    private void EditOrder(Order order)
+    {
+        editingOrder = order;
+        orderForm = new CreateOrderRequest 
+        { 
+            CustomerId = order.CustomerId,
+            Notes = order.Notes,
+            OrderDetails = order.OrderDetails.Select(od => new CreateOrderDetailRequest
+            {
+                ProductId = od.ProductId,
+                Quantity = od.Quantity,
+                UnitPrice = od.UnitPrice,
+                DiscountPercentage = od.DiscountPercentage
+            }).ToList()
+        };
+        
+        updateForm = new UpdateOrderRequest
+        {
+            Status = order.Status,
+            Notes = order.Notes
+        };
+        
+        showModal = true;
+    }
+
+    private void HideModal()
+    {
+        showModal = false;
+        editingOrder = null;
+        orderForm = new CreateOrderRequest { OrderDetails = new List<CreateOrderDetailRequest>() };
+    }
+
+    private void AddOrderItem()
+    {
+        orderForm.OrderDetails.Add(new CreateOrderDetailRequest());
+    }
+
+    private void RemoveOrderItem(int index)
+    {
+        if (orderForm.OrderDetails.Count > index)
+        {
+            orderForm.OrderDetails.RemoveAt(index);
+        }
+    }
+
+    private decimal CalculateOrderTotal()
+    {
+        return orderForm.OrderDetails.Sum(od => od.Quantity * od.UnitPrice * (1 - (od.DiscountPercentage / 100m)));
+    }
+
+    private async Task SaveOrder()
+    {
+        isSaving = true;
+        try
+        {
+            if (editingOrder != null)
+            {
+                await ApiClient.UpdateOrderAsync(editingOrder.Id, updateForm);
+                _ = ShowStatus("Order updated successfully!", true);
+            }
+            else
+            {
+                var (order, errorMessage) = await ApiClient.CreateOrderWithResultAsync(orderForm);
+                if (order != null)
+                {
+                    _ = ShowStatus("Order created successfully!", true);
+                }
+                else
+                {
+                    _ = ShowStatus($"Failed to create order: {errorMessage ?? "Unknown error"}", false);
+                    isSaving = false;
+                    return;
+                }
+            }
+            
+            await LoadData();
+            HideModal();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving order: {ex.Message}");
+            _ = ShowStatus("Failed to save order. Please try again.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ShowStatus(string message, bool success)
+    {
+        statusMessage = message;
+        isSuccess = success;
+        StateHasChanged();
+        await Task.Delay(3000);
+        statusMessage = null;
+        StateHasChanged();
+    }
+
+    private void ViewOrder(int orderId)
+    {
+        NavigationManager.NavigateTo($"/orders/{orderId}");
+    }
+
+    private async Task ApproveRefundByRequest(PendingRefundRequest request)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Approve refund for order {request.OrderNumber}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var reason = await JSRuntime.InvokeAsync<string?>("prompt", "Enter approval reason:", request.Reason ?? "Approved by admin");
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return;
+        }
+
+        var (success, message) = await ApiClient.ApproveOrderRefundAsync(request.OrderId, reason);
+        await ShowStatus(message, success);
+        if (success)
+        {
+            await LoadData();
+        }
+    }
+
+    private string GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pending" => "bg-yellow-100 text-yellow-800",
+            "Processing" => "bg-blue-100 text-blue-800",
+            "Completed" => "bg-green-100 text-green-800",
+            "Cancelled" => "bg-red-100 text-red-800",
+            "Refunded" => "bg-rose-100 text-rose-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+    }
+}

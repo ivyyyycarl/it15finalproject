@@ -1,0 +1,461 @@
+@page "/supervisor/agents"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor,Admin")]
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@using SupportSalesManagement.Frontend.Services
+@using SupportSalesManagement.Frontend.Models
+@implements IDisposable
+
+<div class="p-6 space-y-4" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="page-local-header flex items-center justify-between">
+        <h1 class="page-title-block text-[22px] font-bold text-gray-900">Agent Management</h1>
+        <button @onclick="OpenAddAgentModal"
+            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add New Agent
+        </button>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-4 border-b border-gray-100 flex justify-end gap-4 bg-gradient-to-r from-violet-50/60 to-white">
+            <input type="text" placeholder="Search agents..." value="@searchInput" @oninput="OnSearchInput"
+                class="w-full md:w-80 lg:w-96 rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500" />
+        </div>
+        @if (!string.IsNullOrEmpty(manageActionError))
+        {
+            <div class="mx-6 mt-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+                @manageActionError
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(manageActionMessage))
+        {
+            <div class="mx-6 mt-4 p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg">
+                @manageActionMessage
+            </div>
+        }
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agent
+                    </th>
+                    <th scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status
+                    </th>
+                    <th scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch
+                    </th>
+                    <th scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created
+                    </th>
+                    <th scope="col"
+                        class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                @if (isLoading)
+                {
+                    <tr>
+                        <td colspan="5" class="px-6 py-10 text-center text-gray-500">Loading agents...</td>
+                    </tr>
+                }
+                else if (filteredAgents == null || !filteredAgents.Any())
+                {
+                    <tr>
+                        <td colspan="5" class="px-6 py-10 text-center text-gray-500">No agents found.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var agent in pagedFilteredAgents)
+                    {
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10">
+                                        <div
+                                            class="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold">
+                                            @agent.FirstName[0]@agent.LastName[0]
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">@agent.FirstName @agent.LastName</div>
+                                        <div class="text-sm text-gray-500">@agent.Email</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span
+                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    @(agent.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full border border-violet-100 bg-violet-50 text-violet-700">
+                                    @FormatBranchLabel(agent)
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                @agent.CreatedAt.ToString("MMM dd, yyyy")
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button @onclick="() => ManageAgent(agent)"
+                                    disabled="@(processingAgentId == agent.Id)"
+                                    class="text-purple-600 hover:text-purple-900 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    @(processingAgentId == agent.Id ? "Saving..." : "Manage")
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+        @if (!isLoading && filteredAgentsList.Any())
+        {
+            <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                <p class="text-sm text-gray-600">
+                    Showing @(((currentPage - 1) * pageSize) + 1)-@Math.Min(currentPage * pageSize, filteredAgentsList.Count) of @filteredAgentsList.Count · Page @currentPage/@totalPages
+                </p>
+                <div class="flex items-center gap-2">
+                    <button type="button" @onclick="PreviousPage" disabled="@(currentPage <= 1)"
+                            class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                    <button type="button" @onclick="NextPage" disabled="@(currentPage >= totalPages)"
+                            class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@if (showAddAgentModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-900">Register New Agent</h3>
+                <button @onclick="() => showAddAgentModal = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <form @onsubmit="HandleAddAgent" class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">First Name</label>
+                        <input type="text" @bind="newAgent.FirstName" required
+                            class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Last Name</label>
+                        <input type="text" @bind="newAgent.LastName" required
+                            class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
+                    <input type="email" @bind="newAgent.Email" required
+                        class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" />
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Password</label>
+                    <input type="password" @bind="newAgent.Password" required
+                        class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                        placeholder="Min 6 characters" />
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1 text-purple-600">Role (Hierarchy
+                        Requirement)</label>
+                    <div
+                        class="flex items-center gap-2 px-4 py-2 bg-purple-50 border border-purple-100 rounded-lg text-purple-700 font-bold text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Agent
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-violet-100 bg-violet-50/70 px-3 py-2 text-xs text-violet-700">
+                    <span class="font-semibold">Branch auto-assignment:</span> @creatorBranchLabel
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
+                        @errorMessage
+                    </div>
+                }
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" @onclick="() => showAddAgentModal = false"
+                        class="flex-1 px-4 py-2 border border-gray-200 text-gray-600 font-bold rounded-lg hover:bg-gray-50 transition-all">
+                        Cancel
+                    </button>
+                    <button type="submit" disabled="@isSubmitting"
+                        class="flex-2 px-6 py-2 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 shadow-md disabled:opacity-50 transition-all">
+                        @(isSubmitting ? "Adding..." : "Add Agent")
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? QuerySearch { get; set; }
+
+    private List<User> agents = new();
+    private bool isLoading = true;
+    private bool showAddAgentModal = false;
+    private bool isSubmitting = false;
+    private string errorMessage = "";
+    private string manageActionMessage = "";
+    private string manageActionError = "";
+    private string searchTerm = "";
+    private string searchInput = "";
+    private int? processingAgentId = null;
+    private CreateUserDto newAgent = new();
+    private CancellationTokenSource? _searchDebounceCts;
+    private int currentPage = 1;
+    private const int pageSize = 25;
+    private int? creatorBranchId;
+    private string creatorBranchLabel = "Unassigned";
+
+    private IEnumerable<User> filteredAgents => agents
+    .Where(a => a.Role == UserRole.Agent)
+    .Where(a => string.IsNullOrEmpty(searchTerm)
+    || a.FirstName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+    || a.LastName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+    || a.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+    private List<User> filteredAgentsList => filteredAgents.ToList();
+    private int totalPages => Math.Max(1, (int)Math.Ceiling(filteredAgentsList.Count / (double)pageSize));
+    private List<User> pagedFilteredAgents => filteredAgentsList
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCreatorBranchContextAsync();
+        await LoadAgents();
+        ApplyDeepLinkFilters();
+    }
+
+    protected override void OnParametersSet()
+    {
+        ApplyDeepLinkFilters();
+    }
+
+    private async Task LoadAgents()
+    {
+        isLoading = true;
+        try
+        {
+            var users = await ApiClient.GetUsersAsync();
+            if (users != null)
+            {
+                agents = users;
+                currentPage = 1;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ManageAgent(User agent)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Apply manage action for {agent.FirstName} {agent.LastName}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        processingAgentId = agent.Id;
+        manageActionError = "";
+        manageActionMessage = "";
+
+        try
+        {
+            var updatedUser = await ApiClient.UpdateUserAsync(agent.Id, new UpdateUserDto
+            {
+                IsActive = !agent.IsActive
+            });
+
+            if (updatedUser == null)
+            {
+                manageActionError = "Unable to update this agent right now. Please try again.";
+                return;
+            }
+
+            manageActionMessage = updatedUser.IsActive
+                ? $"{updatedUser.FirstName} {updatedUser.LastName} is now active."
+                : $"{updatedUser.FirstName} {updatedUser.LastName} has been deactivated.";
+
+            await LoadAgents();
+        }
+        catch (Exception ex)
+        {
+            manageActionError = $"Manage action failed: {ex.Message}";
+        }
+        finally
+        {
+            processingAgentId = null;
+        }
+    }
+
+    private void OpenAddAgentModal()
+    {
+        newAgent = new CreateUserDto { Role = UserRole.Agent, BranchId = creatorBranchId };
+        errorMessage = "";
+        showAddAgentModal = true;
+    }
+
+    private async Task HandleAddAgent()
+    {
+        if (newAgent.BranchId is null || newAgent.BranchId <= 0)
+        {
+            errorMessage = "Your account has no assigned branch. Please contact Admin to assign your branch first.";
+            return;
+        }
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Create this new agent account and assign branch {creatorBranchLabel}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        if (newAgent.Password?.Length < 6)
+        {
+            errorMessage = "Password must be at least 6 characters.";
+            return;
+        }
+
+        isSubmitting = true;
+        errorMessage = "";
+        try
+        {
+            var result = await ApiClient.CreateUserAsync(newAgent);
+            if (result != null)
+            {
+                showAddAgentModal = false;
+                await LoadAgents();
+            }
+            else
+            {
+                errorMessage = "Failed to create agent. Email might already exist.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchInput = e.Value?.ToString() ?? string.Empty;
+        await DebouncedApplySearchAsync();
+    }
+
+    private async Task DebouncedApplySearchAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (token.IsCancellationRequested) return;
+            searchTerm = searchInput;
+            currentPage = 1;
+            SyncUrlState();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void ApplyDeepLinkFilters()
+    {
+        if (QuerySearch is not null)
+        {
+            searchInput = QuerySearch;
+            searchTerm = QuerySearch;
+        }
+    }
+
+    private void SyncUrlState()
+    {
+        var target = string.IsNullOrWhiteSpace(searchTerm)
+            ? "/supervisor/agents"
+            : $"/supervisor/agents?q={Uri.EscapeDataString(searchTerm)}";
+
+        NavigationManager.NavigateTo(target, replace: true);
+    }
+
+    private void PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage >= totalPages) return;
+        currentPage++;
+    }
+
+    private static string FormatBranchLabel(User? user)
+    {
+        if (user is null || user.BranchId is null || user.BranchId <= 0)
+        {
+            return "Unassigned";
+        }
+
+        var branchName = string.IsNullOrWhiteSpace(user.BranchName) ? null : user.BranchName.Trim();
+        return branchName is null
+            ? $"#{user.BranchId}"
+            : $"{branchName} (#{user.BranchId})";
+    }
+
+    private async Task LoadCreatorBranchContextAsync()
+    {
+        try
+        {
+            var current = await ApiClient.GetCurrentUserAsync();
+            creatorBranchId = current?.BranchId;
+            creatorBranchLabel = FormatBranchLabel(current);
+        }
+        catch
+        {
+            creatorBranchId = null;
+            creatorBranchLabel = "Unassigned";
+        }
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+    }
+}

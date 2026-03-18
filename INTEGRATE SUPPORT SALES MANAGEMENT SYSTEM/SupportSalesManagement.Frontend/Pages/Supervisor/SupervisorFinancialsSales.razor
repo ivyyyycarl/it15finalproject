@@ -1,0 +1,376 @@
+@page "/supervisor/financials/sales"
+@layout SupervisorLayout
+@attribute [Authorize(Roles = "Supervisor,Admin,SuperAdmin")]
+@inject SupportSalesManagement.Frontend.Services.ApiClient ApiClient
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+
+<div class="p-6 space-y-4" style="font-family: Inter, sans-serif; font-size: 12px;">
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-[22px] font-bold text-gray-900">Sales Reports</h1>
+                <p class="text-sm text-gray-500">View sales performance and metrics (Read-Only Access)</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button @onclick="ExportToPdf" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    Export to PDF
+                </button>
+                <div class="flex items-center gap-2 px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span class="text-xs font-medium text-yellow-800">Read-Only Access</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex justify-center items-center py-12">
+            <div class="text-gray-500">Loading sales data...</div>
+        </div>
+    }
+    else
+    {
+        <!-- Date Filter -->
+        <div class="bg-gradient-to-r from-white to-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm mb-6">
+            <div class="flex items-center gap-4">
+                <span class="text-sm font-medium text-gray-700">Date Range:</span>
+                <select @bind="selectedPeriod" @bind:event="onchange" @bind:after="OnPeriodChanged" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month" selected>This Month</option>
+                    <option value="quarter">This Quarter</option>
+                    <option value="year">This Year</option>
+                    <option value="custom">Custom Range</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Sales Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-emerald-50 to-white p-5 rounded-xl border border-emerald-100 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Total Sales</p>
+                        <p class="text-2xl font-bold text-gray-900">@($"₱{totalSales:N2}")</p>
+                    </div>
+                    <div class="p-3 bg-green-100 rounded-full">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-blue-50 to-white p-5 rounded-xl border border-blue-100 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Total Orders</p>
+                        <p class="text-2xl font-bold text-gray-900">@totalOrders</p>
+                    </div>
+                    <div class="p-3 bg-blue-100 rounded-full">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-violet-50 to-white p-5 rounded-xl border border-violet-100 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Average Order Value</p>
+                        <p class="text-2xl font-bold text-gray-900">@($"₱{avgOrderValue:N2}")</p>
+                    </div>
+                    <div class="p-3 bg-purple-100 rounded-full">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Sales Table -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Recent Orders</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order Number</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Amount</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @if (recentOrders.Any())
+                        {
+                            @foreach (var order in pagedRecentOrders)
+                            {
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">@order.OrderNumber</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">@order.CustomerName</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@order.OrderDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@(order.ItemCount > 0 ? order.ItemCount : order.OrderDetails.Count)</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">@($"₱{order.TotalAmount:N2}")</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full @GetStatusColor(order.Status)">
+                                            @order.Status
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        @if (!string.IsNullOrEmpty(order.PaymentStatus))
+                                        {
+                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full @GetPaymentStatusColor(order.PaymentStatus)">
+                                                @order.PaymentStatus
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-xs text-gray-500">-</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">No orders found.</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (recentOrders.Any())
+            {
+                <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <span class="text-sm text-gray-500">Showing @(((currentPage - 1) * pageSize) + 1)-@Math.Min(currentPage * pageSize, recentOrders.Count) of @recentOrders.Count · Page @currentPage/@totalPages</span>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @onclick="PreviousPage" disabled="@(currentPage <= 1)" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                        <button type="button" @onclick="NextPage" disabled="@(currentPage >= totalPages)" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "period")]
+    public string? QueryPeriod { get; set; }
+
+    private string selectedPeriod = "month";
+    private bool isLoading = true;
+    
+    private List<Order> allOrders = new();
+    private List<Order> recentOrders = new();
+    private List<Product> allProducts = new();
+    
+    private decimal totalSales = 0;
+    private int totalOrders = 0;
+    private decimal avgOrderValue = 0;
+    private int currentPage = 1;
+    private const int pageSize = 15;
+    private int totalPages => Math.Max(1, (int)Math.Ceiling(recentOrders.Count / (double)pageSize));
+    private List<Order> pagedRecentOrders => recentOrders.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        ApplyDeepLinkFilters();
+    }
+
+    protected override void OnParametersSet()
+    {
+        ApplyDeepLinkFilters();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var ordersTask = ApiClient.GetOrdersAsync();
+            var productsTask = ApiClient.GetProductsAsync();
+            
+            await Task.WhenAll(ordersTask, productsTask);
+            
+            var orders = await ordersTask;
+            var products = await productsTask;
+            
+            if (orders != null)
+            {
+                allOrders = orders;
+            }
+            
+            if (products != null)
+            {
+                allProducts = products;
+            }
+            
+            ApplyDateFilter();
+            CalculateStats();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading sales data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplyDateFilter()
+    {
+        var now = DateTime.Now;
+        var filtered = allOrders.AsEnumerable();
+
+        switch (selectedPeriod)
+        {
+            case "today":
+                filtered = filtered.Where(o => o.OrderDate.Date == now.Date);
+                break;
+            case "week":
+                var weekStart = now.AddDays(-(int)now.DayOfWeek);
+                filtered = filtered.Where(o => o.OrderDate >= weekStart);
+                break;
+            case "month":
+                filtered = filtered.Where(o => o.OrderDate.Year == now.Year && o.OrderDate.Month == now.Month);
+                break;
+            case "quarter":
+                var quarterStart = new DateTime(now.Year, ((now.Month - 1) / 3) * 3 + 1, 1);
+                filtered = filtered.Where(o => o.OrderDate >= quarterStart);
+                break;
+            case "year":
+                filtered = filtered.Where(o => o.OrderDate.Year == now.Year);
+                break;
+        }
+
+        recentOrders = filtered
+            .OrderByDescending(o => o.OrderDate)
+            .ToList();
+        currentPage = 1;
+    }
+
+    private void CalculateStats()
+    {
+        var now = DateTime.Now;
+        var filtered = allOrders.AsEnumerable();
+
+        switch (selectedPeriod)
+        {
+            case "today":
+                filtered = filtered.Where(o => o.OrderDate.Date == now.Date);
+                break;
+            case "week":
+                var weekStart = now.AddDays(-(int)now.DayOfWeek);
+                filtered = filtered.Where(o => o.OrderDate >= weekStart);
+                break;
+            case "month":
+                filtered = filtered.Where(o => o.OrderDate.Year == now.Year && o.OrderDate.Month == now.Month);
+                break;
+            case "quarter":
+                var quarterStart = new DateTime(now.Year, ((now.Month - 1) / 3) * 3 + 1, 1);
+                filtered = filtered.Where(o => o.OrderDate >= quarterStart);
+                break;
+            case "year":
+                filtered = filtered.Where(o => o.OrderDate.Year == now.Year);
+                break;
+        }
+
+        var ordersList = filtered.ToList();
+        totalOrders = ordersList.Count;
+        totalSales = ordersList.Sum(o => o.TotalAmount);
+        avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+    }
+
+    private string GetStatusColor(string status)
+    {
+        return status.ToLower() switch
+        {
+            "completed" => "bg-green-100 text-green-800",
+            "processing" => "bg-yellow-100 text-yellow-800",
+            "pending" => "bg-gray-100 text-gray-800",
+            "cancelled" => "bg-red-100 text-red-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private string GetPaymentStatusColor(string paymentStatus)
+    {
+        return paymentStatus.ToLower() switch
+        {
+            "paid" => "bg-green-100 text-green-800",
+            "pending" => "bg-yellow-100 text-yellow-800",
+            "failed" => "bg-red-100 text-red-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private void OnPeriodChanged()
+    {
+        ApplyDateFilter();
+        CalculateStats();
+        SyncUrlState();
+        StateHasChanged();
+    }
+
+    private async Task ExportToPdf()
+    {
+        await JSRuntime.InvokeVoidAsync("exportToPdf", "Sales Report");
+    }
+
+    private void ApplyDeepLinkFilters()
+    {
+        if (string.IsNullOrWhiteSpace(QueryPeriod))
+        {
+            return;
+        }
+
+        var normalized = QueryPeriod.Trim().ToLowerInvariant();
+        if (normalized is "today" or "week" or "month" or "quarter" or "year" or "custom")
+        {
+            selectedPeriod = normalized;
+            ApplyDateFilter();
+            CalculateStats();
+        }
+    }
+
+    private void SyncUrlState()
+    {
+        var target = selectedPeriod == "month"
+            ? "/supervisor/financials/sales"
+            : $"/supervisor/financials/sales?period={Uri.EscapeDataString(selectedPeriod)}";
+
+        NavigationManager.NavigateTo(target, replace: true);
+    }
+
+    private void PreviousPage()
+    {
+        if (currentPage <= 1) return;
+        currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage >= totalPages) return;
+        currentPage++;
+    }
+}

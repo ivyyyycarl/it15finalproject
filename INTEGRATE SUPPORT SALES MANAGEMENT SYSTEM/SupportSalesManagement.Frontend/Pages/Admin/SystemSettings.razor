@@ -1,0 +1,524 @@
+@page "/admin/settings"
+@layout AdminLayout
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>System Settings - SupportFlow</PageTitle>
+
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">System Settings</h1>
+            <p class="text-gray-600 mt-1">Configure system-wide settings and preferences</p>
+        </div>
+        <div class="flex space-x-3">
+            <button @onclick="SaveSettings" class="btn btn-primary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                Save Changes
+            </button>
+        </div>
+    </div>
+
+    <!-- Settings Sections -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- General Settings -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Email Configuration -->
+            <div class="card p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Email Configuration</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Email Notifications</p>
+                            <p class="text-xs text-gray-500">Send email alerts when accounts are created, passwords reset, etc.</p>
+                        </div>
+                        <button @onclick="ToggleEmailNotifications" class="relative inline-flex h-6 w-11 items-center rounded-full @(settings.EmailNotifications ? "bg-blue-600" : "bg-gray-200")">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition @(settings.EmailNotifications ? "translate-x-6" : "translate-x-1")"></span>
+                        </button>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">SMTP Server</label>
+                        <input 
+                            @bind="settings.SmtpServer"
+                            type="text"
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="smtp.gmail.com">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">SMTP Port</label>
+                            <input 
+                                @bind="settings.SmtpPort"
+                                type="number"
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="587">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Sender Name</label>
+                            <input 
+                                @bind="settings.SenderName"
+                                type="text"
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="SupportFlow System">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Sender Email (Gmail)</label>
+                        <input 
+                            @bind="settings.FromEmail"
+                            type="email"
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="youremail@gmail.com">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">App Password</label>
+                        <input 
+                            @bind="settings.SmtpPassword"
+                            type="password"
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter Gmail App Password">
+                        <p class="text-xs text-gray-400 mt-1">For Gmail: Go to Google Account &gt; Security &gt; 2-Step Verification &gt; App Passwords to generate one.</p>
+                    </div>
+
+                    <!-- Test Email -->
+                    <div class="border-t border-gray-200 pt-4">
+                        <div class="flex items-end gap-3">
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700">Send Test Email</label>
+                                <input 
+                                    @bind="testEmailAddress"
+                                    type="email"
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="test@example.com">
+                            </div>
+                            <button @onclick="SendTestEmail" disabled="@isSendingTest"
+                                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors disabled:opacity-50 whitespace-nowrap">
+                                @if (isSendingTest)
+                                {
+                                    <span>Sending...</span>
+                                }
+                                else
+                                {
+                                    <span>Send Test</span>
+                                }
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(testEmailResult))
+                        {
+                            <p class="text-sm mt-2 @(testEmailSuccess ? "text-emerald-600" : "text-red-600")">@testEmailResult</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backup Settings -->
+            <div class="card p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Backup Configuration</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Auto-Backup</p>
+                            <p class="text-xs text-gray-500">Daily database backups</p>
+                        </div>
+                        <button @onclick="ToggleAutoBackup" class="relative inline-flex h-6 w-11 items-center rounded-full @(settings.AutoBackup ? "bg-blue-600" : "bg-gray-200")">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition @(settings.AutoBackup ? "translate-x-6" : "translate-x-1")"></span>
+                        </button>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Backup Schedule</label>
+                        <select @bind="settings.BackupSchedule" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="daily">Daily at 2:00 AM</option>
+                            <option value="weekly">Weekly on Sunday</option>
+                            <option value="monthly">Monthly on 1st</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Retention Period</label>
+                        <select @bind="settings.RetentionDays" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="7">7 days</option>
+                            <option value="30">30 days</option>
+                            <option value="90">90 days</option>
+                            <option value="365">1 year</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Settings -->
+            <div class="card p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Security Settings</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Two-Factor Authentication</p>
+                            <p class="text-xs text-gray-500">Require 2FA for all users</p>
+                        </div>
+                        <button @onclick="ToggleTwoFactorAuth" class="relative inline-flex h-6 w-11 items-center rounded-full @(settings.TwoFactorAuth ? "bg-blue-600" : "bg-gray-200")">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition @(settings.TwoFactorAuth ? "translate-x-6" : "translate-x-1")"></span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Session Timeout</p>
+                            <p class="text-xs text-gray-500">Auto-logout after inactivity</p>
+                        </div>
+                        <select @bind="settings.SessionTimeout" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="30">30 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="120">2 hours</option>
+                            <option value="240">4 hours</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Password Complexity</p>
+                            <p class="text-xs text-gray-500">Minimum password requirements</p>
+                        </div>
+                        <select @bind="settings.PasswordComplexity" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="simple">Simple (6 chars)</option>
+                            <option value="medium">Medium (8 chars, mixed)</option>
+                            <option value="strong">Strong (12 chars, symbols)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Maintenance -->
+            <div class="card p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">System Maintenance</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Maintenance Mode</p>
+                            <p class="text-xs text-gray-500">Temporarily disable system for maintenance</p>
+                        </div>
+                        <button @onclick="ToggleMaintenanceMode" class="relative inline-flex h-6 w-11 items-center rounded-full @(settings.MaintenanceMode ? "bg-red-600" : "bg-gray-200")">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition @(settings.MaintenanceMode ? "translate-x-6" : "translate-x-1")"></span>
+                        </button>
+                    </div>
+
+                    @if (settings.MaintenanceMode)
+                    {
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                            <p class="text-sm text-yellow-800">
+                                <strong>Warning:</strong> Maintenance mode is active. Users cannot access the system.
+                            </p>
+                        </div>
+                    }
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <button @onclick="CreateBackup" class="btn btn-secondary">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Create Backup
+                        </button>
+                        <button @onclick="ClearCache" class="btn btn-secondary">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Clear Cache
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="space-y-6">
+            <!-- System Health -->
+            <div class="card p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">System Health</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Database</span>
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                            <span class="text-sm text-green-600">Healthy</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">API Server</span>
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                            <span class="text-sm text-green-600">Running</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Email Service</span>
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                            <span class="text-sm text-green-600">Connected</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Storage</span>
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+                            <span class="text-sm text-yellow-600">78% used</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Backups -->
+            <div class="card p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Backups</h3>
+                <div class="space-y-3">
+                    @foreach (var backup in recentBackups)
+                    {
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">@backup.Name</p>
+                                <p class="text-xs text-gray-500">@backup.CreatedAt.ToString("MMM dd, yyyy HH:mm")</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm text-gray-900">@backup.Size</p>
+                                <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                    @backup.Status
+                                </span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- System Info -->
+            <div class="card p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">System Information</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Version</span>
+                        <span class="text-sm font-medium text-gray-900">v2.1.0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Uptime</span>
+                        <span class="text-sm font-medium text-gray-900">15 days, 8 hours</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Last Update</span>
+                        <span class="text-sm font-medium text-gray-900">2 days ago</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Environment</span>
+                        <span class="text-sm font-medium text-gray-900">Production</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private SystemSettingsData settings = new();
+    private List<BackupInfo> recentBackups = new();
+    private string testEmailAddress = "";
+    private string? testEmailResult;
+    private bool testEmailSuccess;
+    private bool isSendingTest;
+    private string? saveMessage;
+    private bool saveSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSettings();
+        LoadRecentBackups();
+    }
+
+    private async Task LoadSettings()
+    {
+        try
+        {
+            var emailSettings = await ApiClient.GetEmailSettingsAsync();
+            if (emailSettings != null)
+            {
+                settings.SmtpServer = emailSettings.SmtpServer;
+                settings.SmtpPort = emailSettings.SmtpPort;
+                settings.FromEmail = emailSettings.SenderEmail;
+                settings.SenderName = emailSettings.SenderName;
+                settings.EmailNotifications = emailSettings.EnableEmailNotifications;
+            }
+        }
+        catch
+        {
+            settings = new SystemSettingsData
+            {
+                EmailNotifications = true,
+                SmtpServer = "smtp.gmail.com",
+                SmtpPort = 587,
+                FromEmail = "",
+                SenderName = "SupportFlow System",
+            };
+        }
+
+        settings.AutoBackup = true;
+        settings.BackupSchedule = "daily";
+        settings.RetentionDays = 30;
+        settings.TwoFactorAuth = false;
+        settings.SessionTimeout = 60;
+        settings.PasswordComplexity = "medium";
+        settings.MaintenanceMode = false;
+    }
+
+    private void LoadRecentBackups()
+    {
+        recentBackups = new List<BackupInfo>
+        {
+            new BackupInfo { Name = "Daily Backup", CreatedAt = DateTime.Now.AddDays(-1), Size = "245 MB", Status = "Success" },
+            new BackupInfo { Name = "Daily Backup", CreatedAt = DateTime.Now.AddDays(-2), Size = "238 MB", Status = "Success" },
+            new BackupInfo { Name = "Manual Backup", CreatedAt = DateTime.Now.AddDays(-3), Size = "251 MB", Status = "Success" },
+            new BackupInfo { Name = "Daily Backup", CreatedAt = DateTime.Now.AddDays(-4), Size = "242 MB", Status = "Failed" }
+        };
+    }
+
+    private void ToggleEmailNotifications() => settings.EmailNotifications = !settings.EmailNotifications;
+    private void ToggleAutoBackup() => settings.AutoBackup = !settings.AutoBackup;
+    private void ToggleTwoFactorAuth() => settings.TwoFactorAuth = !settings.TwoFactorAuth;
+    private void ToggleMaintenanceMode() => settings.MaintenanceMode = !settings.MaintenanceMode;
+
+    private void ToggleSetting(string setting)
+    {
+        switch (setting)
+        {
+            case "emailNotifications":
+                settings.EmailNotifications = !settings.EmailNotifications;
+                break;
+            case "autoBackup":
+                settings.AutoBackup = !settings.AutoBackup;
+                break;
+            case "twoFactorAuth":
+                settings.TwoFactorAuth = !settings.TwoFactorAuth;
+                break;
+            case "maintenanceMode":
+                settings.MaintenanceMode = !settings.MaintenanceMode;
+                break;
+        }
+        StateHasChanged();
+    }
+
+    private async Task SaveSettings()
+    {
+        try
+        {
+            var (success, message) = await ApiClient.SaveEmailSettingsAsync(new
+            {
+                SmtpServer = settings.SmtpServer,
+                SmtpPort = settings.SmtpPort,
+                SenderEmail = settings.FromEmail,
+                SenderName = settings.SenderName,
+                SmtpPassword = settings.SmtpPassword,
+                EnableEmailNotifications = settings.EmailNotifications
+            });
+            saveSuccess = success;
+            saveMessage = message;
+        }
+        catch (Exception ex)
+        {
+            saveSuccess = false;
+            saveMessage = $"Failed to save settings: {ex.Message}";
+        }
+        StateHasChanged();
+        await Task.Delay(3000);
+        saveMessage = null;
+        StateHasChanged();
+    }
+
+    private async Task SendTestEmail()
+    {
+        if (string.IsNullOrWhiteSpace(testEmailAddress))
+        {
+            testEmailResult = "Please enter an email address.";
+            testEmailSuccess = false;
+            return;
+        }
+
+        isSendingTest = true;
+        testEmailResult = null;
+        StateHasChanged();
+
+        try
+        {
+            var (success, message) = await ApiClient.SendTestEmailAsync(testEmailAddress);
+            testEmailSuccess = success;
+            testEmailResult = message;
+        }
+        catch (Exception ex)
+        {
+            testEmailSuccess = false;
+            testEmailResult = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSendingTest = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreateBackup()
+    {
+        Console.WriteLine("[Admin] Backup requested at {0}", DateTime.Now);
+        var newBackup = new BackupInfo
+        {
+            Name = "Manual Backup",
+            CreatedAt = DateTime.Now,
+            Size = "N/A",
+            Status = "Logged"
+        };
+        recentBackups.Insert(0, newBackup);
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private async Task ClearCache()
+    {
+        Console.WriteLine("[Admin] Cache clear requested at {0}", DateTime.Now);
+        await Task.CompletedTask;
+    }
+
+    public class SystemSettingsData
+    {
+        public bool EmailNotifications { get; set; }
+        public string SmtpServer { get; set; } = "smtp.gmail.com";
+        public int SmtpPort { get; set; } = 587;
+        public string FromEmail { get; set; } = "";
+        public string SenderName { get; set; } = "SupportFlow System";
+        public string SmtpPassword { get; set; } = "";
+        public bool AutoBackup { get; set; }
+        public string BackupSchedule { get; set; } = "";
+        public int RetentionDays { get; set; }
+        public bool TwoFactorAuth { get; set; }
+        public int SessionTimeout { get; set; }
+        public string PasswordComplexity { get; set; } = "";
+        public bool MaintenanceMode { get; set; }
+    }
+
+    public class BackupInfo
+    {
+        public string Name { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+        public string Size { get; set; } = "";
+        public string Status { get; set; } = "";
+    }
+
+    public class EmailSettingsDto
+    {
+        public string SmtpServer { get; set; } = "";
+        public int SmtpPort { get; set; }
+        public string SenderEmail { get; set; } = "";
+        public string SenderName { get; set; } = "";
+        public bool EnableSsl { get; set; }
+        public bool EnableEmailNotifications { get; set; }
+    }
+}

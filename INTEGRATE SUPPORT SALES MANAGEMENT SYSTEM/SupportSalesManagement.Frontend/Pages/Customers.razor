@@ -1,0 +1,515 @@
+@page "/customers"
+@page "/customers/{customerId:int}"
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+@using SupportSalesManagement.Frontend.Models
+@using CustomerModel = SupportSalesManagement.Frontend.Models.Customer
+@using SupportSalesManagement.Frontend.Services
+
+<PageTitle>Customers</PageTitle>
+
+<div class="px-4 py-6 sm:px-0">
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white @(isSuccess ? "bg-green-600" : "bg-red-600") transition-all duration-300">
+            <div class="flex items-center gap-2">
+                <span>@statusMessage</span>
+                <button @onclick="() => statusMessage = null" class="ml-2 text-white/80 hover:text-white">&times;</button>
+            </div>
+        </div>
+    }
+
+    <div class="mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Customers</h1>
+                <p class="mt-1 text-sm text-gray-600">Manage customer information and interactions</p>
+            </div>
+            <button @onclick="ShowCreateModal"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md">
+                Add Customer
+            </button>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="bg-white shadow rounded-lg mb-6 p-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Search Customers</label>
+                <input type="text" value="@searchTerm" @oninput="OnSearchInput" placeholder="Search by name, email, company..."
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+            </div>
+            <div class="flex items-end">
+                <button @onclick="SearchCustomers"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md w-full">
+                    Search
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customers List -->
+    <div class="bg-white shadow rounded-lg">
+        @if (isLoading)
+        {
+            <div class="p-8 text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <p class="mt-2 text-gray-600">Loading customers...</p>
+            </div>
+        }
+        else if (filteredCustomers == null || filteredCustomers.Count == 0)
+        {
+            <div class="p-8 text-center">
+                <p class="text-gray-600">No customers found</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("name")' class="inline-flex items-center gap-1 hover:text-indigo-600">
+                                    Name <span class="text-[10px]">@GetSortIndicator("name")</span>
+                                </button>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("email")' class="inline-flex items-center gap-1 hover:text-indigo-600">
+                                    Email <span class="text-[10px]">@GetSortIndicator("email")</span>
+                                </button>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button @onclick='() => SetSort("company")' class="inline-flex items-center gap-1 hover:text-indigo-600">
+                                    Company <span class="text-[10px]">@GetSortIndicator("company")</span>
+                                </button>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Assigned Branch
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @foreach (var customer in filteredCustomers)
+                        {
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">
+                                        @customer.FirstName @customer.LastName
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @customer.Email
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @customer.Phone
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @customer.Company
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @(string.IsNullOrWhiteSpace(customer.BranchName) ? "Unassigned" : customer.BranchName)
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        @customer.CustomerType
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium @(customer.IsActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800")">
+                                        @(customer.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button @onclick="() => ViewCustomer(customer.Id)"
+                                        class="text-indigo-600 hover:text-indigo-900 mr-3">View</button>
+                                    <button @onclick="() => EditCustomer(customer)"
+                                        class="text-gray-600 hover:text-gray-900">Edit</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                <p class="text-sm text-gray-500">Showing @(filteredCustomers.Any() ? (((currentPage - 1) * pageSize) + 1) : 0)-@Math.Min(currentPage * pageSize, totalCustomerCount) of @totalCustomerCount customers · Page @currentPage/@totalPages</p>
+                <div class="flex items-center gap-2">
+                    <button @onclick="PreviousPage" disabled="@(currentPage <= 1 || CustomerId.HasValue)"
+                        class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        Previous
+                    </button>
+                    <button @onclick="NextPage" disabled="@(currentPage >= totalPages || CustomerId.HasValue)"
+                        class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        Next
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+@if (showModal)
+{
+    <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                    @(editingCustomer != null ? "Edit Customer" : "Add New Customer")
+                </h3>
+
+                <form @onsubmit="SaveCustomer">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">First Name</label>
+                                <input type="text" @bind="customerForm.FirstName" required
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Last Name</label>
+                                <input type="text" @bind="customerForm.LastName" required
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" @bind="customerForm.Email" required
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Phone</label>
+                            <input type="tel" @bind="customerForm.Phone"
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Company</label>
+                            <input type="text" @bind="customerForm.Company"
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Address</label>
+                            <input type="text" @bind="customerForm.Address"
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">City</label>
+                                <input type="text" @bind="customerForm.City"
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Country</label>
+                                <input type="text" @bind="customerForm.Country"
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Customer Type</label>
+                            <select @bind="customerForm.CustomerType"
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="Individual">Individual</option>
+                                <option value="Business">Business</option>
+                                <option value="Enterprise">Enterprise</option>
+                            </select>
+                        </div>
+
+                        @if (editingCustomer != null)
+                        {
+                            <div>
+                                <label class="flex items-center">
+                                    <input type="checkbox" @bind="updateForm.IsActive"
+                                        class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
+                                    <span class="ml-2 text-sm text-gray-700">Active Customer</span>
+                                </label>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button type="button" @onclick="HideModal"
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-4 rounded-md">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled="@isSaving"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50">
+                            @(isSaving ? "Saving..." : "Save")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CustomerModel> customers = new();
+    private List<CustomerModel> filteredCustomers = new();
+    private CustomerModel? editingCustomer;
+    private CreateCustomerRequest customerForm = new();
+    private UpdateCustomerRequest updateForm = new();
+    private string searchTerm = "";
+    private bool isLoading = true;
+    private bool showModal = false;
+    private bool isSaving = false;
+    private string? statusMessage;
+    private bool isSuccess;
+    private int currentPage = 1;
+    private int pageSize = 25;
+    private int totalPages = 1;
+    private int totalCustomerCount = 0;
+    private string sortBy = "name";
+    private string sortDir = "asc";
+    private CancellationTokenSource? _searchDebounceCts;
+
+    [Parameter]
+    public int? CustomerId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (CustomerId.HasValue && customers.Any())
+        {
+            filteredCustomers = customers.Where(c => c.Id == CustomerId.Value).ToList();
+        }
+        else if (customers.Any())
+        {
+            await SearchCustomers(); // Re-apply current search/filter if any
+        }
+    }
+
+    private async Task LoadCustomers()
+    {
+        isLoading = true;
+        try
+        {
+            if (CustomerId.HasValue)
+            {
+                var single = await ApiClient.GetCustomerAsync(CustomerId.Value);
+                customers = single != null ? new List<CustomerModel> { single } : new List<CustomerModel>();
+                totalCustomerCount = customers.Count;
+                totalPages = 1;
+            }
+            else
+            {
+                var paged = await ApiClient.GetCustomersPagedAsync(currentPage, pageSize, searchTerm, sortBy, sortDir);
+                customers = paged?.Items ?? new List<CustomerModel>();
+                totalCustomerCount = paged?.TotalCount ?? customers.Count;
+                totalPages = Math.Max(1, paged?.TotalPages ?? 1);
+            }
+
+            if (CustomerId.HasValue)
+            {
+                filteredCustomers = customers.Where(c => c.Id == CustomerId.Value).ToList();
+            }
+            else
+            {
+                filteredCustomers = customers;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading customers: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SearchCustomers()
+    {
+        if (CustomerId.HasValue)
+        {
+            filteredCustomers = customers;
+        }
+        else
+        {
+            currentPage = 1;
+            await LoadCustomers();
+        }
+    }
+
+    private async Task SetSort(string field)
+    {
+        if (string.Equals(sortBy, field, StringComparison.OrdinalIgnoreCase))
+        {
+            sortDir = sortDir == "asc" ? "desc" : "asc";
+        }
+        else
+        {
+            sortBy = field;
+            sortDir = "asc";
+        }
+
+        await SearchCustomers();
+    }
+
+    private string GetSortIndicator(string field)
+    {
+        if (!string.Equals(sortBy, field, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return sortDir == "asc" ? "ASC" : "DESC";
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? string.Empty;
+        await DebouncedSearchCustomersAsync();
+    }
+
+    private async Task DebouncedSearchCustomersAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            if (token.IsCancellationRequested) return;
+            await SearchCustomers();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private async Task PreviousPage()
+    {
+        if (CustomerId.HasValue || currentPage <= 1) return;
+        currentPage--;
+        await LoadCustomers();
+    }
+
+    private async Task NextPage()
+    {
+        if (CustomerId.HasValue || currentPage >= totalPages) return;
+        currentPage++;
+        await LoadCustomers();
+    }
+
+    private void ShowCreateModal()
+    {
+        editingCustomer = null;
+        customerForm = new CreateCustomerRequest();
+        showModal = true;
+    }
+
+    private void EditCustomer(CustomerModel customer)
+    {
+        editingCustomer = customer;
+        customerForm = new CreateCustomerRequest
+            {
+                FirstName = customer.FirstName,
+                LastName = customer.LastName,
+                Email = customer.Email,
+                Phone = customer.Phone,
+                Company = customer.Company,
+                Address = customer.Address,
+                City = customer.City,
+                Country = customer.Country,
+                CustomerType = customer.CustomerType
+            };
+
+        updateForm = new UpdateCustomerRequest
+            {
+                FirstName = customer.FirstName,
+                LastName = customer.LastName,
+                Email = customer.Email,
+                Phone = customer.Phone,
+                Company = customer.Company,
+                Address = customer.Address,
+                City = customer.City,
+                Country = customer.Country,
+                CustomerType = customer.CustomerType,
+                IsActive = customer.IsActive
+            };
+
+        showModal = true;
+    }
+
+    private void HideModal()
+    {
+        showModal = false;
+        editingCustomer = null;
+        customerForm = new CreateCustomerRequest();
+    }
+
+    private async Task SaveCustomer()
+    {
+        isSaving = true;
+        try
+        {
+            if (editingCustomer != null)
+            {
+                await ApiClient.UpdateCustomerAsync(editingCustomer.Id, updateForm);
+            }
+            else
+            {
+                await ApiClient.CreateCustomerAsync(customerForm);
+            }
+
+            await LoadCustomers();
+            HideModal();
+            _ = ShowStatus("Customer saved successfully!", true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving customer: {ex.Message}");
+            _ = ShowStatus("Failed to save customer. Please try again.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ShowStatus(string message, bool success)
+    {
+        statusMessage = message;
+        isSuccess = success;
+        StateHasChanged();
+        await Task.Delay(3000);
+        statusMessage = null;
+        StateHasChanged();
+    }
+
+    private void ViewCustomer(int customerId)
+    {
+        NavigationManager.NavigateTo($"/customers/{customerId}");
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+    }
+}

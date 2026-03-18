@@ -1,0 +1,27 @@
+# .gitignore for .NET
+
+# Build outputs
+**/bin/
+**/obj/
+**/publish/
+**/deploy/
+**/_temp_buildDebug/
+**/_temp_build_verify/
+**/_verify_build2/
+**/_authfix_obj/
+**/_authfix_out/
+
+# IDE specific
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Deployment zips
+# MonsterASP_Deployment_v*.zip

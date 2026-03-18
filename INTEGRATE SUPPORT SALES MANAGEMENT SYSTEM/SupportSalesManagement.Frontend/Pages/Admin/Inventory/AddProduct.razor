@@ -1,0 +1,371 @@
+@page "/admin/products/new"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Text.RegularExpressions
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Add New Product</PageTitle>
+
+<div class="px-6 py-8">
+    <div class="max-w-full mx-auto">
+        <!-- Header -->
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <button @onclick="GoBack" class="text-sm text-gray-500 hover:text-gray-900 mb-2 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Back to Products
+                </button>
+                <h1 class="text-2xl font-bold text-gray-900">Add New Item</h1>
+                <p class="mt-1 text-sm text-gray-500">Create a new product in the inventory catalog.</p>
+            </div>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+            <div class="p-6 md:p-8">
+                <EditForm Model="@productModel" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-red-700">@errorMessage</p>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <!-- Left Column: Image -->
+                        <div class="lg:col-span-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Product Picture</label>
+                            <div
+                                class="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:bg-gray-100 transition-colors">
+                                <div class="relative mb-4">
+                                    @if (!string.IsNullOrEmpty(productModel.ImageUrl))
+                                    {
+                                        <img src="@productModel.ImageUrl" alt="Product preview"
+                                            class="h-48 w-48 object-cover rounded-lg shadow-sm" />
+                                        <button type="button" @onclick="ClearImage"
+                                            class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <div class="h-48 w-48 bg-gray-200 rounded-lg flex items-center justify-center">
+                                            <svg class="h-16 w-16 text-gray-400" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="text-center">
+                                    <InputFile OnChange="HandleImageUpload" class="hidden" id="file-upload"
+                                        accept=".jpg,.jpeg,.png,.webp" />
+                                    <label for="file-upload"
+                                        class="cursor-pointer bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        @(isUploading ? "Uploading..." : "Change Photo")
+                                    </label>
+                                    <p class="mt-2 text-xs text-gray-500">JPG, PNG, WebP up to 10MB</p>
+                                    @if (!string.IsNullOrEmpty(uploadError))
+                                    {
+                                        <p class="mt-1 text-xs text-red-500">@uploadError</p>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Details -->
+                        <div class="lg:col-span-2 space-y-6">
+                            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <!-- Product Name -->
+                                <div class="sm:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700">Product Name *</label>
+                                    <div class="mt-1">
+                                        <InputText @bind-Value="productModel.Name"
+                                            class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                            placeholder="e.g. Vintage Leather Jacket" />
+                                        <ValidationMessage For="@(() => productModel.Name)"
+                                            class="text-red-500 text-xs mt-1" />
+                                    </div>
+                                </div>
+
+                                <!-- SKU Code -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">SKU Code *</label>
+                                    <div class="mt-1">
+                                        <InputText @bind-Value="productModel.SKU" readonly
+                                            class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-500 cursor-not-allowed sm:text-sm"
+                                            placeholder="Auto-generated" />
+                                        <ValidationMessage For="@(() => productModel.SKU)"
+                                            class="text-red-500 text-xs mt-1" />
+                                    </div>
+                                </div>
+
+                                <!-- Price -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Price (₱) *</label>
+                                    <div class="mt-1 relative rounded-md shadow-sm">
+                                        <div
+                                            class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <span class="text-gray-500 sm:text-sm">₱</span>
+                                        </div>
+                                        <InputNumber @bind-Value="productModel.Price"
+                                            class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 pl-7 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                            placeholder="0.00" />
+                                    </div>
+                                </div>
+
+                                <!-- Initial Stock -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Initial Stock *</label>
+                                    <div class="mt-1">
+                                        <InputNumber @bind-Value="productModel.StockQuantity"
+                                            class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                            placeholder="0" />
+                                    </div>
+                                </div>
+
+                                <!-- Category -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Category *</label>
+                                    <div class="mt-1">
+                                        <select @bind="productModel.Category"
+                                            class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                            <option value="TShirt">T-Shirt</option>
+                                            <option value="Dress">Dress</option>
+                                            <option value="Jacket">Jacket</option>
+                                            <option value="Sweater">Sweater</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Status -->
+                                <div class="flex items-center h-full pt-6">
+                                    <div class="flex items-center">
+                                        <InputCheckbox @bind-Value="productModel.IsActive" id="isActive"
+                                            class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded" />
+                                        <label for="isActive" class="ml-2 block text-sm text-gray-900">Active
+                                            Product</label>
+                                    </div>
+                                </div>
+
+                                <!-- Description -->
+                                <div class="sm:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                                    <div class="mt-1">
+                                        <InputTextArea @bind-Value="productModel.Description" rows="4"
+                                            class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                            placeholder="Detailed product description..." />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="mt-8 pt-5 border-t border-gray-200 flex justify-end">
+                        <button type="button" @onclick="GoBack"
+                            class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-3">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled="@isSubmitting"
+                            class="bg-blue-600 border border-transparent rounded-md shadow-sm py-2 px-4 inline-flex justify-center text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
+                            @if (isSubmitting)
+                            {
+                                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                        stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                    </path>
+                                </svg>
+                                <span>Creating...</span>
+                            }
+                            else
+                            {
+                                <span>Create Product</span>
+                            }
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private CreateProductRequest productModel = new CreateProductRequest { Category = "TShirt" };
+    private bool isSubmitting = false;
+    private bool isUploading = false;
+    private string? errorMessage;
+    private string? uploadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GenerateSKU();
+    }
+
+    private async Task GenerateSKU()
+    {
+        try
+        {
+            var products = await ApiClient.GetProductsAsync();
+            var maxSkuNumber = products?
+                .Select(p => TryParseProdSkuNumber(p.SKU))
+                .Where(n => n.HasValue)
+                .Select(n => n!.Value)
+                .DefaultIfEmpty(0)
+                .Max() ?? 0;
+
+            productModel.SKU = $"PROD-{(maxSkuNumber + 1):D3}";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error generating SKU: {ex.Message}");
+            productModel.SKU = "PROD-001";
+        }
+    }
+
+    private static int? TryParseProdSkuNumber(string? sku)
+    {
+        if (string.IsNullOrWhiteSpace(sku))
+        {
+            return null;
+        }
+
+        var match = Regex.Match(sku.Trim(), "^PROD-(\\d+)$", RegexOptions.IgnoreCase);
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        return int.TryParse(match.Groups[1].Value, out var number) ? number : null;
+    }
+
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        isUploading = true;
+        uploadError = null;
+
+        try
+        {
+            var file = e.File;
+            if (file != null)
+            {
+                // Validate file type
+                var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp" };
+                if (!allowedTypes.Contains(file.ContentType))
+                {
+                    uploadError = "Invalid file type. Please upload a JPG, PNG, or WebP image.";
+                    return;
+                }
+
+                // Validate file size (10MB)
+                if (file.Size > 10 * 1024 * 1024)
+                {
+                    uploadError = "File size exceeds 10MB limit.";
+                    return;
+                }
+
+                var (imageUrl, error) = await ApiClient.UploadImageAsync(file);
+                if (!string.IsNullOrEmpty(imageUrl))
+                {
+                    productModel.ImageUrl = imageUrl;
+                }
+                else
+                {
+                    uploadError = error ?? "Failed to upload image. Please try again.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Error uploading image: {ex.Message}";
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private void ClearImage()
+    {
+        productModel.ImageUrl = null;
+        uploadError = null;
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/admin/products");
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+
+        try
+        {
+            var (result, error) = await ApiClient.CreateProductAsync(productModel);
+
+            if (result == null && IsDuplicateSkuError(error))
+            {
+                // Regenerate once in case another user created
+                // the same SKU while this form was open.
+                await GenerateSKU();
+                (result, error) = await ApiClient.CreateProductAsync(productModel);
+            }
+
+            if (result != null)
+            {
+                // Success
+                NavigationManager.NavigateTo("/admin/products");
+            }
+            else
+            {
+                errorMessage = error ?? "Failed to create product. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An unexpected error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private static bool IsDuplicateSkuError(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+        {
+            return false;
+        }
+
+        return error.Contains("SKU already exists", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("Product with this SKU already exists", StringComparison.OrdinalIgnoreCase);
+    }
+}

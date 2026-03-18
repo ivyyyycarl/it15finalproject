@@ -1,0 +1,197 @@
+@page "/customer/profile"
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject NavigationManager NavigationManager
+@inject ApiClient ApiClient
+@inject IJSRuntime JSRuntime
+
+@layout CustomerLayout
+
+<PageTitle>My Profile - ClassicFit</PageTitle>
+
+<div class="customer-theme min-h-screen bg-gradient-to-br from-[#f8fbff] via-[#f3f8ff] to-[#edf5ff] py-4">
+    <div class="max-w-5xl space-y-3">
+        <div class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            <h1 class="text-[21px] font-bold text-gray-900">My Profile</h1>
+            <p class="text-sm text-gray-500 mt-1">Manage your personal account information.</p>
+        </div>
+
+        @if (currentUser == null)
+        {
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm text-sm text-gray-500">
+                Loading profile...
+            </div>
+        }
+        else
+        {
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                        <p class="text-xs uppercase text-blue-600 font-semibold">Username</p>
+                        <p class="text-sm font-bold text-gray-900 mt-1">@GetUsername()</p>
+                    </div>
+                    <div class="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+                        <p class="text-xs uppercase text-indigo-600 font-semibold">Email</p>
+                        <p class="text-sm font-bold text-gray-900 mt-1">@currentUser.Email</p>
+                    </div>
+                    <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                        <p class="text-xs uppercase text-emerald-600 font-semibold">Role</p>
+                        <p class="text-sm font-bold text-gray-900 mt-1">@currentUser.Role</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <h2 class="text-base font-bold text-gray-900 mb-3">Account Security</h2>
+
+                    @if (!string.IsNullOrWhiteSpace(passwordMessage))
+                    {
+                        <div class="mb-3 rounded-lg border px-3 py-2 text-sm @(passwordChanged ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700")">
+                            @passwordMessage
+                        </div>
+                    }
+
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Current Password</label>
+                            <input type="password" @bind="currentPassword" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">New Password</label>
+                            <input type="password" @bind="newPassword" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                        </div>
+                        <button @onclick="HandleChangePassword" class="w-full rounded-lg bg-[#1B3A4B] text-white px-4 py-2.5 text-sm font-semibold hover:bg-[#162e3c] transition-colors">
+                            Update Password
+                        </button>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                    <h2 class="text-base font-bold text-gray-900 mb-3">Update Username</h2>
+
+                    @if (!string.IsNullOrWhiteSpace(profileMessage))
+                    {
+                        <div class="mb-3 rounded-lg border px-3 py-2 text-sm @(profileUpdated ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700")">
+                            @profileMessage
+                        </div>
+                    }
+
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Username</label>
+                            <input type="text" @bind="usernameInput" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                        </div>
+                        <button @onclick="HandleUpdateUsername" class="w-full rounded-lg bg-blue-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors">
+                            Save Username
+                        </button>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm md:col-span-2">
+                    <h2 class="text-base font-bold text-gray-900 mb-3">Quick Links</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <button @onclick='() => NavigationManager.NavigateTo("/customer/orders?tab=orders")' class="w-full rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-left text-sm font-semibold text-blue-700 hover:shadow-sm transition-shadow">
+                            View My Orders
+                        </button>
+                        <button @onclick='() => NavigationManager.NavigateTo("/customer/support")' class="w-full rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-left text-sm font-semibold text-indigo-700 hover:shadow-sm transition-shadow">
+                            Contact Support
+                        </button>
+                        <button @onclick='() => NavigationManager.NavigateTo("/customer/shop")' class="w-full rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-left text-sm font-semibold text-violet-700 hover:shadow-sm transition-shadow">
+                            Continue Shopping
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private User? currentUser;
+    private string usernameInput = string.Empty;
+    private string currentPassword = string.Empty;
+    private string newPassword = string.Empty;
+    private string profileMessage = string.Empty;
+    private bool profileUpdated;
+    private string passwordMessage = string.Empty;
+    private bool passwordChanged;
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = await ApiClient.GetCurrentUserAsync();
+        if (currentUser == null) return;
+
+        usernameInput = GetUsername();
+    }
+
+    private string GetUsername()
+    {
+        if (currentUser == null) return "N/A";
+        var full = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
+        return string.IsNullOrWhiteSpace(full) ? currentUser.Email : full;
+    }
+
+    private async Task HandleUpdateUsername()
+    {
+        profileMessage = string.Empty;
+        profileUpdated = false;
+
+        if (currentUser == null || string.IsNullOrWhiteSpace(usernameInput))
+        {
+            profileMessage = "Username cannot be empty.";
+            return;
+        }
+
+        var confirm = await JSRuntime.InvokeAsync<bool>("confirm", "Confirm update username?");
+        if (!confirm) return;
+
+        var parts = usernameInput.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        var firstName = parts.Length > 0 ? parts[0] : usernameInput.Trim();
+        var lastName = parts.Length > 1 ? parts[1] : currentUser.LastName;
+
+        var updated = await ApiClient.UpdateUserAsync(currentUser.Id, new UpdateUserDto
+        {
+            FirstName = firstName,
+            LastName = lastName,
+            Email = currentUser.Email
+        });
+
+        if (updated != null)
+        {
+            currentUser = updated;
+            await ApiClient.LocalStorage.SetItemAsync("user", updated);
+            usernameInput = GetUsername();
+            profileUpdated = true;
+            profileMessage = "Username updated successfully.";
+        }
+        else
+        {
+            profileMessage = "Failed to update username.";
+        }
+    }
+
+    private async Task HandleChangePassword()
+    {
+        passwordMessage = string.Empty;
+        passwordChanged = false;
+
+        if (currentUser == null || string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+        {
+            passwordMessage = "Please complete all password fields.";
+            return;
+        }
+
+        var confirm = await JSRuntime.InvokeAsync<bool>("confirm", "Confirm change password?");
+        if (!confirm) return;
+
+        var (success, message) = await ApiClient.ChangePasswordAsync(currentUser.Id, currentPassword, newPassword);
+        passwordChanged = success;
+        passwordMessage = message;
+        if (success)
+        {
+            currentPassword = string.Empty;
+            newPassword = string.Empty;
+        }
+    }
+}

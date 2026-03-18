@@ -1,0 +1,260 @@
+@* Escalate Ticket Modal Component *@
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+
+@if (IsVisible)
+{
+    <div class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 class="text-2xl font-bold text-gray-900">Escalate Ticket</h2>
+                <button @onclick="Close" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="px-6 py-6 space-y-5">
+                @if (SelectedTicket != null)
+                {
+                    <!-- Ticket Info -->
+                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-gray-900 mb-1">@SelectedTicket.Subject</h3>
+                                <p class="text-sm text-gray-600 mb-2">@SelectedTicket.Description</p>
+                                <div class="flex items-center space-x-4 text-xs text-gray-500">
+                                    <span>Ticket #@SelectedTicket.Id</span>
+                                    <span>Customer: @SelectedTicket.CustomerName</span>
+                                    <span>Agent: @SelectedTicket.AssignedTo</span>
+                                </div>
+                            </div>
+                            <span
+                                class="@GetPriorityBadgeClass(SelectedTicket.Priority) px-2 py-1 text-xs font-medium rounded-full">
+                                @SelectedTicket.Priority
+                            </span>
+                        </div>
+                    </div>
+                }
+
+                <!-- Escalation Level -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Escalate To</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" @onclick='() => escalationLevel = "Admin"'
+                            class="@(escalationLevel == "Admin" ? "bg-blue-100 border-blue-500 text-blue-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md">
+                            <div class="flex items-center justify-center space-x-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                                <span>Admin</span>
+                            </div>
+                        </button>
+                        <button type="button" @onclick='() => escalationLevel = "Super Admin"'
+                            class="@(escalationLevel == "Super Admin" ? "bg-red-100 border-red-500 text-red-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md">
+                            <div class="flex items-center justify-center space-x-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                <span>Super Admin</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Escalation Reason -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Reason for Escalation</label>
+                    <select @bind="escalationReason"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Select a reason</option>
+                        <option value="Technical Complexity">Technical Complexity</option>
+                        <option value="Customer Request">Customer Request</option>
+                        <option value="Policy Exception">Policy Exception Required</option>
+                        <option value="High Value">High Value Customer</option>
+                        <option value="Repeated Issue">Repeated Issue</option>
+                        <option value="Complaint">Customer Complaint</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <!-- Adjust Priority -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Adjust Priority</label>
+                    <div class="grid grid-cols-4 gap-3">
+                        <button type="button" @onclick='() => newPriority = "Low"'
+                            class="@(newPriority == "Low" ? "bg-green-100 border-green-500 text-green-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md">
+                            Low
+                        </button>
+                        <button type="button" @onclick='() => newPriority = "Medium"'
+                            class="@(newPriority == "Medium" ? "bg-yellow-100 border-yellow-500 text-yellow-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md">
+                            Medium
+                        </button>
+                        <button type="button" @onclick='() => newPriority = "High"'
+                            class="@(newPriority == "High" ? "bg-orange-100 border-orange-500 text-orange-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md">
+                            High
+                        </button>
+                        <button type="button" @onclick='() => newPriority = "Urgent"'
+                            class="@(newPriority == "Urgent" ? "bg-red-100 border-red-500 text-red-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md">
+                            Urgent
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Escalation Notes</label>
+                    <textarea @bind="escalationNotes" rows="4"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        placeholder="Add any additional context or instructions for the escalation recipient..."></textarea>
+                </div>
+
+                <!-- Notification -->
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="sendNotification" @bind="sendNotification"
+                        class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                    <label for="sendNotification" class="text-sm font-medium text-gray-700">
+                        Send email notification to recipient
+                    </label>
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded">
+                        @errorMessage
+                    </div>
+                }
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
+                <button @onclick="Close"
+                    class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors">
+                    Cancel
+                </button>
+                <button @onclick="EscalateTicket" disabled="@isSubmitting"
+                    class="px-5 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                    @if (isSubmitting)
+                    {
+                        <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        <span>Escalating...</span>
+                    }
+                    else
+                    {
+                        <span>Escalate Ticket</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public Ticket? SelectedTicket { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnTicketEscalated { get; set; }
+
+    private string escalationLevel = "Admin";
+    private string escalationReason = "";
+    private string newPriority = "";
+    private string escalationNotes = "";
+    private bool sendNotification = true;
+    private string errorMessage = "";
+    private bool isSubmitting = false;
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedTicket != null)
+        {
+            newPriority = SelectedTicket.Priority;
+        }
+    }
+
+    private async Task EscalateTicket()
+    {
+        errorMessage = "";
+
+        // Validation
+        if (SelectedTicket == null)
+        {
+            errorMessage = "No ticket selected for escalation.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(escalationLevel))
+        {
+            errorMessage = "Please select an escalation level.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(escalationReason))
+        {
+            errorMessage = "Please select a reason for escalation.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        try
+        {
+            var success = await ApiClient.EscalateTicketAsync(SelectedTicket.Id);
+            if (!success)
+                throw new Exception("Failed to escalate ticket. Please try again.");
+
+            await OnTicketEscalated.InvokeAsync();
+            ResetForm();
+            await Close();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error escalating ticket: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        ResetForm();
+        await OnClose.InvokeAsync();
+    }
+
+    private void ResetForm()
+    {
+        escalationLevel = "Admin";
+        escalationReason = "";
+        newPriority = "";
+        escalationNotes = "";
+        sendNotification = true;
+        errorMessage = "";
+    }
+
+    private string GetPriorityBadgeClass(string priority)
+    {
+        return priority switch
+        {
+            "Urgent" => "bg-red-100 text-red-800",
+            "High" => "bg-orange-100 text-orange-800",
+            "Medium" => "bg-yellow-100 text-yellow-800",
+            "Low" => "bg-green-100 text-green-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+}
+
+

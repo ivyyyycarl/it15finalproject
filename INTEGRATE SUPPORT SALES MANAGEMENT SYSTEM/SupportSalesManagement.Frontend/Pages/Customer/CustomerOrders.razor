@@ -1,0 +1,1055 @@
+@page "/customer/orders"
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@using System.Text.Json
+@inject NavigationManager NavigationManager
+@inject CartService CartService
+@inject ApiClient ApiClient
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+@layout CustomerLayout
+
+<PageTitle>Shopping Cart - ClassicFit</PageTitle>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+    :root {
+        --primary-purple: #1B3A4B;
+        --primary-secondary: #80A1BA;
+        --text-main: #111827;
+        --text-muted: #6b7280;
+        --bg-gray: #f9fafb;
+        --border-color: #e5e7eb;
+    }
+
+    .shopping-cart-container {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--bg-gray);
+        min-height: 100vh;
+        color: var(--text-main);
+    }
+
+    .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--text-muted);
+        padding: 20px 0;
+    }
+
+    .breadcrumb span.active {
+        color: var(--text-main);
+    }
+
+    .cart-title {
+        font-size: 21px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+
+    .item-count {
+        color: var(--text-muted);
+        font-size: 16px;
+        margin-bottom: 32px;
+    }
+
+    .cart-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    @@media (max-width: 1024px) {
+        .cart-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .cart-items-list {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .cart-item-card {
+        background: #fff;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 24px;
+        display: flex;
+        gap: 24px;
+        position: relative;
+    }
+
+    .item-image-wrapper {
+        width: 120px;
+        height: 120px;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #f3f4f6;
+        flex-shrink: 0;
+    }
+
+    .item-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .item-details {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .item-name {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .item-variation {
+        color: var(--text-muted);
+        font-size: 14px;
+        margin-bottom: 16px;
+    }
+
+    .quantity-controls {
+        display: flex;
+        align-items: center;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        width: fit-content;
+    }
+
+    .q-btn {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text-main);
+        font-size: 18px;
+    }
+
+    .q-value {
+        width: 40px;
+        text-align: center;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .item-price-info {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+    }
+
+    .item-total-price {
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    .item-unit-price {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .remove-item-btn {
+        position: absolute;
+        top: 24px;
+        right: 24px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    /* Summary Sidebar */
+    .summary-card {
+        background: #fff;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 24px;
+        height: min-content;
+        position: sticky;
+        top: 24px;
+    }
+
+    .summary-title {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 24px;
+    }
+
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        font-size: 16px;
+    }
+
+    .row-label {
+        color: var(--text-muted);
+    }
+
+    .row-value {
+        font-weight: 500;
+    }
+
+    .summary-divider {
+        height: 1px;
+        background: var(--border-color);
+        margin: 20px 0;
+    }
+
+    .total-row {
+        font-size: 20px;
+        font-weight: 700;
+        margin-bottom: 24px;
+    }
+
+    .promo-section {
+        margin-bottom: 24px;
+    }
+
+    .promo-input-group {
+        display: flex;
+        gap: 8px;
+    }
+
+    .promo-input {
+        flex: 1;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+
+    .promo-btn {
+        background: none;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .btn-checkout-primary {
+        width: 100%;
+        background-color: var(--primary-purple);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 16px 0;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        margin-bottom: 24px;
+        transition: opacity 0.2s;
+    }
+
+    .btn-checkout-primary:hover {
+        opacity: 0.9;
+    }
+
+    .payment-methods {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .payment-icon {
+        height: 24px;
+        opacity: 0.8;
+    }
+
+    .secure-note {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .continue-shopping {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--primary-purple);
+        font-weight: 500;
+        text-decoration: none;
+        margin-top: 24px;
+        font-size: 14px;
+    }
+
+    /* Tabs Styling */
+    .tabs-navigation {
+        display: flex;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 24px;
+    }
+
+    .tab-btn {
+        padding: 12px 24px;
+        background: none;
+        border: none;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        position: relative;
+    }
+
+    .tab-btn.active {
+        color: var(--primary-purple);
+    }
+
+    .tab-btn.active::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--primary-purple);
+    }
+</style>
+
+<div class="customer-theme shopping-cart-container pb-24 bg-gradient-to-br from-[#f8fbff] via-[#f5f8ff] to-[#eef5ff]">
+    <div class="container mx-auto px-6">
+
+        <div class="mb-4 flex flex-wrap items-center gap-2">
+            <button @onclick='() => SetTab("cart")' class="px-4 py-2 rounded-lg text-sm font-semibold @(showCart ? "bg-[#1B3A4B] text-white" : "bg-white text-gray-700 border border-gray-200")">Cart</button>
+            <button @onclick='() => SetTab("orders")' class="px-4 py-2 rounded-lg text-sm font-semibold @(!showCart ? "bg-[#1B3A4B] text-white" : "bg-white text-gray-700 border border-gray-200")">My Orders (@orders.Count)</button>
+            @if (!showCart)
+            {
+                <button @onclick='() => SetOrderFilter("ToShip")' class="px-3 py-2 rounded-lg text-xs font-semibold @(orderFilter == "ToShip" ? "bg-blue-600 text-white" : "bg-white border border-blue-100 text-blue-700")">To Ship</button>
+                <button @onclick='() => SetOrderFilter("ToReceive")' class="px-3 py-2 rounded-lg text-xs font-semibold @(orderFilter == "ToReceive" ? "bg-indigo-600 text-white" : "bg-white border border-indigo-100 text-indigo-700")">To Receive</button>
+                <button @onclick='() => SetOrderFilter("Refund")' class="px-3 py-2 rounded-lg text-xs font-semibold @(orderFilter == "Refund" ? "bg-emerald-600 text-white" : "bg-white border border-emerald-100 text-emerald-700")">Refund Items</button>
+                <button @onclick='() => SetOrderFilter("")' class="px-3 py-2 rounded-lg text-xs font-semibold @(string.IsNullOrWhiteSpace(orderFilter) ? "bg-gray-800 text-white" : "bg-white border border-gray-200 text-gray-700")">All</button>
+            }
+        </div>
+
+        @if (showCart)
+        {
+            @if (isCheckingOut)
+            {
+                <!-- Checkout Section (Stripe) -->
+                <div class="max-w-xl mx-auto bg-white p-8 rounded-xl shadow-sm mt-8">
+                    <h2 class="text-[21px] font-bold mb-6 text-center">Secure Payment</h2>
+                    @if (isMockPaymentMode)
+                    {
+                        <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                            Development mock payment mode is active. Stripe keys are not configured. Payment is simulated, but successful checkout still creates a real order and updates inventory stock.
+                        </div>
+                    }
+                    @if (isStripeTestMode)
+                    {
+                        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                            Test mode is enabled. Please use only this card:
+                            <span class="font-semibold">4242 4242 4242 4242</span>.
+                            Use any future expiry date, any CVC, and any ZIP code.
+                        </div>
+                    }
+                    @if (!isMockPaymentMode)
+                    {
+                        <div id="payment-element">
+                            <div class="animate-pulse flex space-x-4">
+                                <div class="flex-1 space-y-4 py-1">
+                                    <div class="h-10 bg-gray-100 rounded"></div>
+                                    <div class="h-10 bg-gray-100 rounded"></div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    <div id="payment-message" class="hidden mb-4 text-red-500 text-sm mt-4 text-center"></div>
+                    <div class="flex gap-4 justify-center mt-8">
+                        <button @onclick="() => isCheckingOut = false" class="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                            Back
+                        </button>
+                        <button @onclick="ProcessPayment" disabled="@isProcessingPayment" class="px-8 py-2 bg-[#1B3A4B] text-white rounded-lg hover:bg-[#162e3c] disabled:opacity-50 min-w-[150px] font-semibold transition-opacity">
+                            @(isProcessingPayment ? "Processing..." : $"Pay P{GetCheckoutTotal():N2}")
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <nav class="breadcrumb">
+                    <span>Home</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <span class="active">Shopping Cart</span>
+                </nav>
+
+                <h1 class="cart-title">Shopping Cart</h1>
+                <p class="item-count">@GetSelectedItemsCount() selected of @CartService.GetCartCount() items in your cart</p>
+
+                <div class="cart-grid">
+                    <!-- Left Column: Items -->
+                    <div class="cart-items-list">
+                        <div class="bg-white border border-gray-200 rounded-xl p-4">
+                            <div class="grid grid-cols-12 gap-3 text-xs font-semibold text-gray-500 mb-2">
+                                <div class="col-span-6">Product</div>
+                                <div class="col-span-3 text-center">Quantity</div>
+                                <div class="col-span-3 text-right">Price</div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                            <input type="checkbox" class="w-4 h-4" checked="@IsAllSelected" @onchange="ToggleSelectAll" />
+                            <span class="text-sm font-semibold text-gray-700">Select All</span>
+                            </div>
+                        </div>
+                        @foreach (var item in CartService.GetCartItems())
+                        {
+                            <div class="cart-item-card">
+                                <div class="pt-1">
+                                    <input type="checkbox"
+                                           class="w-4 h-4"
+                                           checked="@selectedProductIds.Contains(item.Product.Id)"
+                                           @onchange="(e) => ToggleSelectItem(item.Product.Id, e)" />
+                                </div>
+                                <div class="item-image-wrapper">
+                                    @if (!string.IsNullOrEmpty(item.Product.ImageUrl))
+                                    {
+                                        <img src="@item.Product.ImageUrl" alt="@item.Product.Name" class="item-image" />
+                                    }
+                                    else
+                                    {
+                                        <div class="w-full h-full flex items-center justify-center">
+                                            <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="item-details">
+                                    <div>
+                                        <h3 class="item-name">@item.Product.Name</h3>
+                                        <p class="item-variation">Variation: @item.Product.Category</p>
+                                    </div>
+                                    
+                                    <div class="quantity-controls">
+                                        <button class="q-btn" @onclick="() => DecreaseQuantity(item)">-</button>
+                                        <input type="number"
+                                               min="1"
+                                               class="q-value bg-transparent border-0 outline-none"
+                                               value="@item.Quantity"
+                                               @onchange="(e) => OnQuantityInput(item, e)" />
+                                        <button class="q-btn" @onclick="() => IncreaseQuantity(item)">+</button>
+                                    </div>
+                                </div>
+
+                                <div class="item-price-info">
+                                    <div class="item-total-price">P@((item.Product.Price * item.Quantity).ToString("N2"))</div>
+                                    <div class="item-unit-price">P@(item.Product.Price.ToString("N2")) each</div>
+                                </div>
+
+                                <button class="remove-item-btn" @onclick="() => RemoveItem(item.Product.Id)">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        }
+
+                        @if (!CartService.GetCartItems().Any())
+                        {
+                            <div class="bg-white p-12 rounded-xl border border-dashed border-gray-300 text-center">
+                                <p class="text-gray-500 mb-4">Your shopping cart is empty</p>
+                                <a href="/customer/shop" class="text-[#1B3A4B] font-semibold hover:underline">Start Shopping</a>
+                            </div>
+                        }
+
+                        @if (showDetailedSummary)
+                        {
+                            <div class="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white shadow-sm p-4 w-full md:max-w-[340px] ml-auto">
+                                <h2 class="text-base font-bold text-[#1B3A4B] mb-3">Order Summary</h2>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-gray-500">Subtotal</span>
+                                        <span class="font-semibold">P@(GetSelectedTotal().ToString("N2"))</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-gray-500">Shipping</span>
+                                        <span class="font-semibold">@(GetShippingFee() == 0 ? "Free" : $"P{GetShippingFee():N2}")</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-gray-500">Tax</span>
+                                        <span class="font-semibold">P@(GetEstimatedTax().ToString("N2"))</span>
+                                    </div>
+                                </div>
+                                <div class="h-px bg-blue-100 my-3"></div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-sm text-blue-700 font-semibold uppercase">Total</span>
+                                    <p class="text-xl font-extrabold text-[#1B3A4B]">P@(GetCheckoutTotal().ToString("N2"))</p>
+                                </div>
+                                <button class="btn-checkout-primary px-4 py-2.5 text-sm w-full" style="margin-bottom:0;" @onclick="InitCheckout" disabled="@(GetSelectedItemsCount() == 0)">
+                                    Proceed to Checkout
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="hidden md:flex rounded-xl border border-gray-200 bg-white p-4 items-center justify-between gap-3 w-full md:max-w-[320px] ml-auto">
+                                <div>
+                                    <p class="text-xs text-gray-500 font-semibold uppercase">Total</p>
+                                    <p class="text-2xl font-extrabold text-[#1B3A4B]">P@(GetCheckoutTotal().ToString("N2"))</p>
+                                </div>
+                                <button class="btn-checkout-primary px-4 py-2.5 text-sm" style="width:auto;margin-bottom:0;" @onclick="InitCheckout" disabled="@(GetSelectedItemsCount() == 0)">
+                                    Checkout
+                                </button>
+                            </div>
+                        }
+
+                        <a href="/customer/shop" class="continue-shopping mt-2">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                            Continue Shopping
+                        </a>
+
+                        <div class="md:hidden fixed bottom-3 left-3 right-3 z-30 rounded-xl border border-[#1B3A4B]/20 bg-gradient-to-r from-[#1B3A4B] to-[#2B5B74] p-3 shadow-lg flex items-center justify-between gap-3">
+                            <div>
+                                <p class="text-[11px] text-white/80 font-semibold uppercase">Total</p>
+                                <p class="text-lg font-extrabold text-white">P@(GetCheckoutTotal().ToString("N2"))</p>
+                            </div>
+                            <button class="px-4 py-2 text-sm rounded-lg font-semibold bg-white text-[#1B3A4B] disabled:opacity-50" style="width:auto;margin-bottom:0;" @onclick="InitCheckout" disabled="@(GetSelectedItemsCount() == 0)">
+                                @(showDetailedSummary ? "Proceed" : "Checkout")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <!-- Order History View -->
+            <div class="space-y-6">
+                <h1 class="text-[21px] font-bold mb-6">Order History</h1>
+                
+                @if (lastPlacedOrder != null)
+                {
+                    <div class="bg-white p-6 rounded-xl shadow-sm border-2 border-green-500/20">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded uppercase mb-2 inline-block">Order Success</span>
+                                <h3 class="font-bold text-lg">Order #@lastPlacedOrder.OrderNumber</h3>
+                                <p class="text-sm text-gray-500">Placed on @lastPlacedOrder.OrderDate.ToString("MMM dd, yyyy")</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-2xl font-bold text-[#1B3A4B]">P@(lastPlacedOrder.TotalAmount.ToString("N2"))</p>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @if (FilteredOrders.Any())
+                {
+                    @foreach (var order in FilteredOrders)
+                    {
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex justify-between items-center mb-6">
+                                <div class="flex items-center gap-4">
+                                    <div class="h-10 w-10 bg-gray-50 rounded-lg flex items-center justify-center">
+                                        <svg class="text-gray-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold">Order #@order.OrderNumber</h4>
+                                        <p class="text-sm text-gray-500">@order.OrderDate.ToString("MMM dd, yyyy")</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <span class="px-3 py-1 rounded-full text-xs font-semibold @GetStatusColor(order.Status)">@order.Status</span>
+                                    <p class="font-bold text-lg">P@(order.TotalAmount.ToString("N2"))</p>
+                                </div>
+                            </div>
+                            <div class="divide-y divide-gray-50">
+                                @foreach (var detail in order.OrderDetails)
+                                {
+                                    <div class="py-3 flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            @if (!string.IsNullOrEmpty(detail.Product?.ImageUrl))
+                                            {
+                                                <img src="@detail.Product.ImageUrl" class="h-12 w-12 rounded object-cover" />
+                                            }
+                                            else
+                                            {
+                                                <div class="h-12 w-12 bg-gray-100 rounded flex items-center justify-center"><svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div>
+                                            }
+                                            <div>
+                                                <p class="text-sm font-medium">@(detail.Product?.Name ?? $"Product #{detail.ProductId}")</p>
+                                                <p class="text-xs text-gray-500">Qty: @detail.Quantity</p>
+                                            </div>
+                                        </div>
+                                        <p class="text-sm font-semibold">P@((detail.UnitPrice * detail.Quantity).ToString("N2"))</p>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="text-center py-20 bg-white rounded-xl border border-dashed border-gray-300">
+                        <p class="text-gray-500">You haven't placed any orders yet.</p>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool showCart = true;
+    private List<Order> orders = new();
+    private int currentUserId = 0;
+    private int currentCustomerId = 0;
+    private bool isCheckingOut = false;
+    private bool showDetailedSummary = false;
+    private bool isProcessingPayment = false;
+    private string? clientSecret;
+    private string? stripePublicKey;
+    private bool stripeInitialized = false;
+    private bool isStripeTestMode = false;
+    private bool isMockPaymentMode = false;
+    private Order? lastPlacedOrder;
+    private readonly HashSet<int> selectedProductIds = new();
+    private decimal discountAmount = 0m;
+    private string orderFilter = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CartService.InitializeCartAsync();
+        CartService.OnChange += HandleCartChanged;
+        SyncSelectionWithCart();
+
+        var user = await ApiClient.GetCurrentUserAsync();
+        if (user != null)
+        {
+            currentUserId = user.Id;
+            if (await EnsureCustomerProfileAsync())
+            {
+                await LoadOrders();
+            }
+        }
+
+        var tab = GetQueryParam("tab");
+        if (!string.IsNullOrWhiteSpace(tab))
+        {
+            SetTab(tab);
+            showDetailedSummary = tab.Equals("checkout", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (isCheckingOut && !isMockPaymentMode && !stripeInitialized && !string.IsNullOrEmpty(clientSecret) && !string.IsNullOrEmpty(stripePublicKey))
+        {
+            stripeInitialized = true;
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("initializeStripe", stripePublicKey, clientSecret);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to initialize Stripe: {ex.Message}");
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        CartService.OnChange -= HandleCartChanged;
+    }
+
+    private async Task LoadOrders()
+    {
+        if (currentCustomerId > 0)
+        {
+            var result = await ApiClient.GetOrdersByCustomerAsync(currentCustomerId);
+            if (result != null)
+            {
+                orders = result.OrderByDescending(o => o.OrderDate).ToList();
+            }
+        }
+    }
+
+    private Task IncreaseQuantity(CartItem item) => CartService.UpdateQuantityAsync(item.Product, item.Quantity + 1);
+    private Task DecreaseQuantity(CartItem item) => CartService.UpdateQuantityAsync(item.Product, item.Quantity - 1);
+    
+    private async Task RemoveItem(int productId)
+    {
+        var item = CartService.GetCartItems().FirstOrDefault(i => i.Product.Id == productId);
+        if (item != null)
+        {
+            await CartService.RemoveFromCartAsync(item.Product);
+            selectedProductIds.Remove(productId);
+        }
+    }
+
+    private async Task InitCheckout()
+    {
+        if (currentUserId == 0)
+        {
+            NavigationManager.NavigateTo("/customer/login");
+            return;
+        }
+
+        if (!await EnsureCustomerProfileAsync() || currentCustomerId == 0)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Customer profile error. Please try again.");
+            return;
+        }
+
+        if (!GetSelectedCartItems().Any())
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Please select at least one item.");
+            return;
+        }
+
+        var proceed = await JSRuntime.InvokeAsync<bool>("confirm", $"Proceed to payment for P{GetCheckoutTotal():N2}?");
+        if (!proceed)
+        {
+            return;
+        }
+
+        isProcessingPayment = true;
+        try
+        {
+            stripePublicKey = await ApiClient.GetStripePublicKeyAsync();
+            isMockPaymentMode = !string.IsNullOrWhiteSpace(stripePublicKey)
+                && stripePublicKey.StartsWith("mock_", StringComparison.OrdinalIgnoreCase);
+            isStripeTestMode = !string.IsNullOrWhiteSpace(stripePublicKey)
+                && stripePublicKey.StartsWith("pk_test_", StringComparison.OrdinalIgnoreCase);
+            // We use the total INCLUDING the estimated tax for payment intent
+            clientSecret = await ApiClient.CreatePaymentIntentAsync(GetCheckoutTotal());
+
+            if (!string.IsNullOrEmpty(clientSecret) && !string.IsNullOrEmpty(stripePublicKey))
+            {
+                isCheckingOut = true;
+                stripeInitialized = false;
+                StateHasChanged();
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Failed to initiate payment. Stripe key or payment intent was not returned.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            isProcessingPayment = false;
+        }
+    }
+
+    private async Task<bool> EnsureCustomerProfileAsync()
+    {
+        if (currentUserId == 0) return false;
+        var user = await ApiClient.GetCurrentUserAsync();
+        if (user == null) return false;
+
+        if (currentCustomerId > 0)
+        {
+            var currentCustomer = await ApiClient.GetCustomerAsync(currentCustomerId);
+            if (currentCustomer != null && currentCustomer.UserId == currentUserId)
+            {
+                return true;
+            }
+
+            currentCustomerId = 0;
+        }
+
+        var existingByUser = await ApiClient.GetCustomerByUserIdAsync(currentUserId);
+        if (existingByUser != null)
+        {
+            currentCustomerId = existingByUser.Id;
+            return true;
+        }
+
+        var created = await ApiClient.CreateCustomerAsync(new CreateCustomerRequest
+        {
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email,
+            Phone = "",
+            UserId = user.Id,
+            CustomerType = "Individual"
+        });
+
+        if (created != null && created.UserId == currentUserId)
+        {
+            currentCustomerId = created.Id;
+            return true;
+        }
+
+        // In cases where backend links an existing profile, fetch again by user.
+        var linkedAfterCreate = await ApiClient.GetCustomerByUserIdAsync(currentUserId);
+        if (linkedAfterCreate != null)
+        {
+            currentCustomerId = linkedAfterCreate.Id;
+            return true;
+        }
+
+        return false;
+    }
+
+    private async Task ProcessPayment()
+    {
+        var confirmPayment = await JSRuntime.InvokeAsync<bool>("confirm", $"Confirm payment of P{GetCheckoutTotal():N2}?");
+        if (!confirmPayment)
+        {
+            return;
+        }
+
+        isProcessingPayment = true;
+        StateHasChanged();
+
+        try
+        {
+            if (isMockPaymentMode)
+            {
+                await PlaceOrder($"mock_pi_{Guid.NewGuid():N}");
+                return;
+            }
+
+            var paymentResult = await JSRuntime.InvokeAsync<JsonElement>("confirmPayment");
+            bool success = false;
+            string? paymentIntentId = null;
+
+            if (paymentResult.TryGetProperty("paymentIntent", out var pi))
+            {
+                if (pi.TryGetProperty("status", out var status) && status.GetString() == "succeeded")
+                {
+                    success = true;
+                    if (pi.TryGetProperty("id", out var id)) paymentIntentId = id.GetString();
+                }
+            }
+            else if (paymentResult.TryGetProperty("error", out var error))
+            {
+                string errorMsg = "Payment failed";
+                if (error.TryGetProperty("message", out var msg)) errorMsg = msg.GetString() ?? errorMsg;
+                await JSRuntime.InvokeVoidAsync("showMessage", errorMsg);
+            }
+
+            if (success && !string.IsNullOrEmpty(paymentIntentId))
+            {
+                await PlaceOrder(paymentIntentId);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("showMessage", $"An error occurred: {ex.Message}");
+        }
+        finally
+        {
+            isProcessingPayment = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PlaceOrder(string paymentIntentId)
+    {
+        try
+        {
+            if (!await EnsureCustomerProfileAsync() || currentCustomerId <= 0)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Unable to resolve your customer profile. Please refresh and try again.");
+                return;
+            }
+
+            var cartItems = GetSelectedCartItems();
+            var orderRequest = new CreateOrderRequest
+            {
+                CustomerId = currentCustomerId,
+                OrderDate = DateTime.Now,
+                Status = "Pending",
+                TotalAmount = GetCheckoutTotal(),
+                Notes = "Online Order",
+                PaymentIntentId = paymentIntentId,
+                PaymentStatus = "Paid",
+                OrderDetails = cartItems.Select(i => new CreateOrderDetailRequest
+                {
+                    ProductId = i.Product.Id,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.Product.Price
+                }).ToList()
+            };
+
+            var (order, errorMessage) = await ApiClient.CreateOrderWithResultAsync(orderRequest);
+            if (order != null)
+            {
+                foreach (var selected in cartItems.ToList())
+                {
+                    await CartService.RemoveFromCartAsync(selected.Product);
+                    selectedProductIds.Remove(selected.Product.Id);
+                }
+                isCheckingOut = false;
+                showCart = false;
+                lastPlacedOrder = order;
+                await LoadOrders();
+                var successMessage = isMockPaymentMode
+                    ? "Mock payment successful! Real order placed and inventory updated."
+                    : "Payment successful! Order placed.";
+                await JSRuntime.InvokeVoidAsync("alert", successMessage);
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", $"Payment was confirmed but order creation failed: {errorMessage ?? "Unknown error"}. Please contact support if the issue persists.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Order creation error: {ex.Message}");
+        }
+    }
+
+    private string GetStatusColor(string status)
+    {
+        return status?.ToLower() switch
+        {
+            "pending" => "bg-yellow-100 text-yellow-800",
+            "processing" => "bg-blue-100 text-blue-800",
+            "shipped" => "bg-indigo-100 text-indigo-800",
+            "delivered" => "bg-green-100 text-green-800",
+            "cancelled" => "bg-red-100 text-red-800",
+            "paid" => "bg-green-100 text-green-800",
+            _ => "bg-gray-100 text-gray-800"
+        };
+    }
+
+    private decimal GetDiscountedSubtotal() => Math.Max(0m, GetSelectedTotal() - discountAmount);
+    private decimal GetEstimatedTax() => Math.Round(GetDiscountedSubtotal() * 0.08m, 2);
+    private decimal GetShippingFee() => 0m; // Default shipping policy: always free
+    private decimal GetCheckoutTotal() => Math.Round(GetDiscountedSubtotal() + GetEstimatedTax() + GetShippingFee(), 2);
+
+    private List<CartItem> GetSelectedCartItems()
+    {
+        return CartService.GetCartItems()
+            .Where(i => selectedProductIds.Contains(i.Product.Id))
+            .ToList();
+    }
+
+    private decimal GetSelectedTotal()
+    {
+        return GetSelectedCartItems().Sum(i => i.Product.Price * i.Quantity);
+    }
+
+    private int GetSelectedItemsCount()
+    {
+        return GetSelectedCartItems().Sum(i => i.Quantity);
+    }
+
+    private bool IsAllSelected =>
+        CartService.GetCartItems().Any() &&
+        CartService.GetCartItems().All(i => selectedProductIds.Contains(i.Product.Id));
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        var isChecked = e.Value?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
+        selectedProductIds.Clear();
+
+        if (isChecked)
+        {
+            foreach (var item in CartService.GetCartItems())
+            {
+                selectedProductIds.Add(item.Product.Id);
+            }
+        }
+    }
+
+    private void ToggleSelectItem(int productId, ChangeEventArgs e)
+    {
+        var isChecked = e.Value?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
+        if (isChecked)
+        {
+            selectedProductIds.Add(productId);
+        }
+        else
+        {
+            selectedProductIds.Remove(productId);
+        }
+    }
+
+    private async Task OnQuantityInput(CartItem item, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var qty))
+        {
+            await CartService.UpdateQuantityAsync(item.Product, Math.Max(1, qty));
+        }
+        else
+        {
+            await CartService.UpdateQuantityAsync(item.Product, item.Quantity);
+        }
+    }
+
+    private void SyncSelectionWithCart()
+    {
+        var ids = CartService.GetCartItems().Select(i => i.Product.Id).ToHashSet();
+        selectedProductIds.RemoveWhere(id => !ids.Contains(id));
+        foreach (var id in ids)
+        {
+            selectedProductIds.Add(id);
+        }
+    }
+
+    private void HandleCartChanged()
+    {
+        SyncSelectionWithCart();
+        StateHasChanged();
+    }
+
+    private IEnumerable<Order> FilteredOrders =>
+        orders.Where(o => MatchesOrderFilter(o.Status));
+
+    private bool MatchesOrderFilter(string? status)
+    {
+        var normalized = (status ?? string.Empty).Trim().ToLowerInvariant();
+        return orderFilter switch
+        {
+            "ToShip" => normalized is "pending" or "processing",
+            "ToReceive" => normalized is "shipped",
+            "Refund" => normalized is "refunded" or "returnrequested" or "cancelled",
+            _ => true
+        };
+    }
+
+    private void SetOrderFilter(string value)
+    {
+        orderFilter = value;
+    }
+
+    private void SetTab(string tab)
+    {
+        showCart = !string.Equals(tab, "orders", StringComparison.OrdinalIgnoreCase);
+        showDetailedSummary = string.Equals(tab, "checkout", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string GetQueryParam(string key)
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = uri.Query.TrimStart('?');
+        if (string.IsNullOrWhiteSpace(query)) return string.Empty;
+
+        foreach (var pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var kv = pair.Split('=', 2);
+            if (kv.Length == 2 && string.Equals(Uri.UnescapeDataString(kv[0]), key, StringComparison.OrdinalIgnoreCase))
+            {
+                return Uri.UnescapeDataString(kv[1]);
+            }
+        }
+
+        return string.Empty;
+    }
+}

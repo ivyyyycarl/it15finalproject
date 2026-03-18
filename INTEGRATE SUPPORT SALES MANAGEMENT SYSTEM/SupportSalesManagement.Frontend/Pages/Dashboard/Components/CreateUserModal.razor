@@ -1,0 +1,368 @@
+@* Create User Modal Component *@
+@namespace SupportSalesManagement.Frontend.Pages.Dashboard.Components
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+@inject ApiClient ApiClient
+
+@if (IsVisible)
+{
+    <div class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+                <h2 class="text-2xl font-bold text-gray-900">Create New User</h2>
+                <button @onclick="Close" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="px-6 py-6 space-y-5">
+                <!-- User Information -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                        <input type="text" @bind="fullName"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="John Smith" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Email Address *</label>
+                        <input type="email" @bind="email"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="john@company.com" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+                        <input type="tel" @bind="phoneNumber"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="+1 234 567 8900" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Username *</label>
+                        <input type="text" @bind="username"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="jsmith" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Password *</label>
+                        <input type="password" @bind="password" @oninput="CheckPasswordStrength"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="••••••••" />
+                        @if (!string.IsNullOrEmpty(password))
+                        {
+                            <div class="mt-2">
+                                <div class="flex items-center space-x-2">
+                                    <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                        <div class="@GetPasswordStrengthColor() h-2 rounded-full transition-all"
+                                            style="width: @(passwordStrength * 25)%"></div>
+                                    </div>
+                                    <span class="text-xs font-medium @GetPasswordStrengthTextColor()">
+                                        @GetPasswordStrengthText()
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Role Selection -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Assign Role *</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" @onclick='() => selectedRole = UserRole.Customer'
+                            class="@(selectedRole == UserRole.Customer ? "bg-blue-100 border-blue-500 text-blue-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md flex items-center justify-center space-x-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            <span>Customer</span>
+                        </button>
+                        <button type="button" @onclick='() => selectedRole = UserRole.Agent'
+                            class="@(selectedRole == UserRole.Agent ? "bg-green-100 border-green-500 text-green-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md flex items-center justify-center space-x-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            </svg>
+                            <span>Agent</span>
+                        </button>
+                        <button type="button" @onclick='() => selectedRole = UserRole.Supervisor'
+                            class="@(selectedRole == UserRole.Supervisor ? "bg-purple-100 border-purple-500 text-purple-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md flex items-center justify-center space-x-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                            <span>Supervisor</span>
+                        </button>
+                        <button type="button" @onclick="() => showAdminConfirmation = true"
+                            class="@(selectedRole == UserRole.Admin ? "bg-red-100 border-red-500 text-red-700" : "bg-gray-50 border-gray-300 text-gray-700") border-2 px-4 py-3 rounded-lg font-medium transition-all hover:shadow-md flex items-center justify-center space-x-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            <span>Admin</span>
+                        </button>
+                    </div>
+                </div>
+
+                @if (showAdminConfirmation && selectedRole != UserRole.Admin)
+                {
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-red-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <div class="flex-1">
+                                <p class="text-sm font-semibold text-red-800">Admin Role Confirmation Required</p>
+                                <p class="text-sm text-red-700 mt-1">
+                                    Creating an Admin account grants full system access. Are you sure?
+                                </p>
+                                <div class="mt-3 flex space-x-2">
+                                    <button @onclick='() => { selectedRole = UserRole.Admin; showAdminConfirmation=false; }'
+                                        class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
+                                        Confirm Admin Role
+                                    </button>
+                                    <button @onclick="() => showAdminConfirmation = false"
+                                        class="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Account Status -->
+                <div>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" @bind="isActive" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                        <span class="text-sm font-semibold text-gray-700">Activate account immediately</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1 ml-8">User will be able to log in as soon as account is created</p>
+                </div>
+
+                <!-- Send Welcome Email -->
+                <div>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" @bind="sendWelcomeEmail"
+                            class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
+                        <span class="text-sm font-semibold text-gray-700">Send welcome email with login credentials</span>
+                    </label>
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded">
+                        @errorMessage
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(successMessage))
+                {
+                    <div class="bg-green-50 border-l-4 border-green-500 text-green-700 px-4 py-3 rounded">
+                        @successMessage
+                    </div>
+                }
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3 sticky bottom-0">
+                <button @onclick="Close"
+                    class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors">
+                    Cancel
+                </button>
+                <button @onclick="CreateUser" disabled="@isSubmitting"
+                    class="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                    @if (isSubmitting)
+                    {
+                        <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        <span>Creating...</span>
+                    }
+                    else
+                    {
+                        <span>Create User</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<User> OnUserCreated { get; set; }
+
+    private string fullName = "";
+    private string email = "";
+    private string phoneNumber = "";
+    private string username = "";
+    private string password = "";
+    private UserRole selectedRole = UserRole.Customer;
+    private bool isActive = true;
+    private bool sendWelcomeEmail = true;
+    private bool showAdminConfirmation = false;
+
+    private int passwordStrength = 0;
+    private string errorMessage = "";
+    private string successMessage = "";
+    private bool isSubmitting = false;
+
+    private void CheckPasswordStrength(ChangeEventArgs e)
+    {
+        password = e.Value?.ToString() ?? "";
+        var strength = 0;
+
+        if (password.Length >= 8) strength++;
+        if (password.Any(char.IsUpper)) strength++;
+        if (password.Any(char.IsLower)) strength++;
+        if (password.Any(char.IsDigit)) strength++;
+        if (password.Any(ch => !char.IsLetterOrDigit(ch))) strength++;
+
+        passwordStrength = Math.Min(strength, 4);
+    }
+
+    private string GetPasswordStrengthColor()
+    {
+        return passwordStrength switch
+        {
+            1 => "bg-red-500",
+            2 => "bg-orange-500",
+            3 => "bg-yellow-500",
+            4 => "bg-green-500",
+            _ => "bg-gray-300"
+        };
+    }
+
+    private string GetPasswordStrengthTextColor()
+    {
+        return passwordStrength switch
+        {
+            1 => "text-red-600",
+            2 => "text-orange-600",
+            3 => "text-yellow-600",
+            4 => "text-green-600",
+            _ => "text-gray-600"
+        };
+    }
+
+    private string GetPasswordStrengthText()
+    {
+        return passwordStrength switch
+        {
+            1 => "Weak",
+            2 => "Fair",
+            3 => "Good",
+            4 => "Strong",
+            _ => ""
+        };
+    }
+
+    private async Task CreateUser()
+    {
+        errorMessage = "";
+        successMessage = "";
+
+        // Validation
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            errorMessage = "Full name is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            errorMessage = "Email address is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            errorMessage = "Username is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "Password is required.";
+            return;
+        }
+
+        if (passwordStrength < 3)
+        {
+            errorMessage = "Password is too weak. Please use a stronger password.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        try
+        {
+            var nameParts = fullName.Trim().Split(' ', 2);
+            var dto = new CreateUserDto
+                {
+                    Email = email,
+                    Password = password,
+                    FirstName = nameParts.Length > 0 ? nameParts[0] : fullName,
+                    LastName = nameParts.Length > 1 ? nameParts[1] : "",
+                    Role = selectedRole,
+                    Phone = phoneNumber
+                };
+
+            var newUser = await ApiClient.CreateUserAsync(dto);
+            if (newUser == null)
+                throw new Exception("Failed to create user. Please try again.");
+
+            successMessage = $"User '{fullName}' created successfully!";
+            await OnUserCreated.InvokeAsync(newUser);
+
+            await Task.Delay(1500);
+            await Close();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating user: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        ResetForm();
+        await OnClose.InvokeAsync();
+    }
+
+    private void ResetForm()
+    {
+        fullName = "";
+        email = "";
+        phoneNumber = "";
+        username = "";
+        password = "";
+        selectedRole = UserRole.Customer;
+        isActive = true;
+        sendWelcomeEmail = true;
+        showAdminConfirmation = false;
+        passwordStrength = 0;
+        errorMessage = "";
+        successMessage = "";
+    }
+}
+
+
