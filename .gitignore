@@ -23,5 +23,7 @@
 .DS_Store
 Thumbs.db
 
-# Deployment zips
-# MonsterASP_Deployment_v*.zip
+# Deployment zips (Only v19 and v20 allowed)
+MonsterASP_Deployment_v[0-9]*.zip
+!MonsterASP_Deployment_v19.zip
+!MonsterASP_Deployment_v20.zip
