@@ -1,0 +1,11 @@
+@inject NavigationManager NavigationManager
+
+@using SupportSalesManagement.Frontend.Models
+@using SupportSalesManagement.Frontend.Services
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.NavigateTo("/landing", true);
+    }
+}

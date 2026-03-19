@@ -1,0 +1,409 @@
+@if (!isInitialized)
+{
+    <div class="flex items-center justify-center min-h-screen bg-gray-50">
+        <div class="flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p class="text-gray-500 font-medium">Initializing Workspace...</p>
+        </div>
+    </div>
+}
+else
+{
+    <CascadingAuthenticationState>
+        <ErrorBoundary>
+            <ChildContent>
+                <Router AppAssembly="@typeof(App).Assembly" OnNavigateAsync="HandleNavigateAsync">
+                    <Found Context="routeData">
+                        <AuthorizeRouteView RouteData="@routeData"
+                            DefaultLayout="@typeof(SupportSalesManagement.Frontend.Shared.ERPMainLayout)">
+                            <NotAuthorized>
+                                @if (context.User.Identity?.IsAuthenticated != true)
+                                {
+                                    <RedirectToLogin />
+                                }
+                                else
+                                {
+                                    <div class="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+                                        <div
+                                            class="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center transition-all">
+                                            <div
+                                                class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                                                <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                            </div>
+                                            <h1 class="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+                                            <p class="text-gray-500 mb-8 leading-relaxed">Your current credentials do not have
+                                                permission to access this internal system node.</p>
+                                            <a href="/dashboard"
+                                                class="inline-flex items-center justify-center px-6 py-3 bg-[#3B82F6] text-white font-bold rounded-xl hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20">
+                                                Redirect to Dashboard
+                                            </a>
+                                        </div>
+                                    </div>
+                                }
+                            </NotAuthorized>
+                        </AuthorizeRouteView>
+                        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+                    </Found>
+                    <NotFound>
+                        <PageTitle>Page Not Found - SupportFlow Pro</PageTitle>
+                        <LayoutView Layout="@typeof(SupportSalesManagement.Frontend.Shared.ERPMainLayout)">
+                            <div
+                                class="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                                <div class="text-center">
+                                    <h1 class="text-6xl font-bold text-gray-900 mb-4">404</h1>
+                                    <p class="text-gray-600 mb-8">Sorry, the page you're looking for doesn't exist.</p>
+                                    <a href="/dashboard" class="text-blue-600 hover:underline">Go to Dashboard</a>
+                                </div>
+                            </div>
+                        </LayoutView>
+                    </NotFound>
+                </Router>
+            </ChildContent>
+            <ErrorContent>
+                <div class="p-4 bg-red-100 border border-red-400 text-red-700 rounded m-4">
+                    <h3 class="font-bold">An error occurred</h3>
+                    <p>@context.Message</p>
+                    <p class="text-xs mt-2">@context.StackTrace</p>
+                </div>
+            </ErrorContent>
+        </ErrorBoundary>
+    </CascadingAuthenticationState>
+}
+
+@using SupportSalesManagement.Frontend.Services
+@using SupportSalesManagement.Frontend.Models
+@inject AuthenticationService AuthService
+@inject SignalRService SignalR
+@inject NotificationService Notifications
+@inject ApiClient ApiClient
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+@code {
+    private string? errorMessage;
+    private bool isInitialized = false;
+    private ModuleAccessConfig? moduleAccessConfig;
+    private TenantSubscriptionModel? tenantSubscription;
+    private DateTime moduleConfigLoadedAtUtc = DateTime.MinValue;
+    private DateTime subscriptionLoadedAtUtc = DateTime.MinValue;
+    private bool isModuleRedirectInProgress;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await AuthService.InitializeAsync();
+
+            SignalR.OnDataChanged += HandleDataChanged;
+            _ = StartSignalRSafe();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            Console.WriteLine($"APP INIT ERROR: {ex}");
+        }
+        finally
+        {
+            isInitialized = true;
+        }
+    }
+
+    private async Task StartSignalRSafe()
+    {
+        try
+        {
+            await Task.Delay(1000);
+            await SignalR.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SignalR] Startup error: {ex.Message}");
+        }
+    }
+
+    private void HandleDataChanged(string entityType, string action)
+    {
+        Notifications.HandleDataChanged(entityType, action);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleNavigateAsync(NavigationContext context)
+    {
+        var currentUser = AuthService.CurrentUser;
+        if (currentUser == null || currentUser.Role == UserRole.SuperAdmin)
+        {
+            return;
+        }
+
+        var path = "/" + context.Path.TrimStart('/').ToLowerInvariant();
+
+        if (path.StartsWith("/module-disabled", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // Hard guard: all /superadmin routes are SuperAdmin-only.
+        if (path.StartsWith("/superadmin", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo(GetRoleFallbackRoute(currentUser.Role), replace: true);
+            return;
+        }
+
+        await EnsureModuleAccessConfigLoadedAsync();
+        await EnsureSubscriptionLoadedAsync();
+        if (moduleAccessConfig == null || moduleAccessConfig.Modules.Count == 0)
+        {
+            if (!isModuleRedirectInProgress)
+            {
+                isModuleRedirectInProgress = true;
+                NavigationManager.NavigateTo("/module-disabled?module=configuration", replace: true);
+            }
+            return;
+        }
+
+        var moduleKey = ResolveModuleKey(path);
+        if (string.IsNullOrWhiteSpace(moduleKey) && IsManagedRoute(path))
+        {
+            if (!isModuleRedirectInProgress)
+            {
+                isModuleRedirectInProgress = true;
+                NavigationManager.NavigateTo("/module-disabled?module=route-policy", replace: true);
+            }
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(moduleKey))
+        {
+            return;
+        }
+
+        if (IsAllowedForRole(moduleKey, currentUser.Role) && IsAllowedBySubscription(moduleKey))
+        {
+            isModuleRedirectInProgress = false;
+            return;
+        }
+
+        if (!isModuleRedirectInProgress)
+        {
+            isModuleRedirectInProgress = true;
+            NavigationManager.NavigateTo($"/module-disabled?module={Uri.EscapeDataString(moduleKey)}", replace: true);
+        }
+    }
+
+    private async Task EnsureModuleAccessConfigLoadedAsync()
+    {
+        // Refresh periodically so policy updates propagate without restart.
+        if (moduleAccessConfig != null && DateTime.UtcNow - moduleConfigLoadedAtUtc < TimeSpan.FromMinutes(2))
+        {
+            return;
+        }
+
+        moduleAccessConfig = await ApiClient.GetModuleAccessConfigAsync();
+        moduleConfigLoadedAtUtc = DateTime.UtcNow;
+    }
+
+    private async Task EnsureSubscriptionLoadedAsync()
+    {
+        if (tenantSubscription != null && DateTime.UtcNow - subscriptionLoadedAtUtc < TimeSpan.FromMinutes(2))
+        {
+            return;
+        }
+
+        tenantSubscription = await ApiClient.GetMySubscriptionAsync();
+        subscriptionLoadedAtUtc = DateTime.UtcNow;
+    }
+
+    private string? ResolveModuleKey(string path)
+    {
+        if (path.Contains("/module-management") || path.Contains("/my-profile"))
+        {
+            return null;
+        }
+
+        if (path.Contains("/module-disabled"))
+        {
+            return null;
+        }
+
+        if (path.Contains("/dashboard"))
+        {
+            return "dashboard";
+        }
+
+        if (path.Contains("/inventory") || path.Contains("/products") || path.Contains("/catalog"))
+        {
+            return "catalog";
+        }
+
+        if (path.Contains("/catalog") || path.Contains("/shop"))
+        {
+            return "catalog";
+        }
+
+        if (path.Contains("/orders") || path.Contains("/returns"))
+        {
+            return "orders";
+        }
+
+        if (path.Contains("/tickets") || path.Contains("/support"))
+        {
+            return "tickets";
+        }
+
+        if (path.Contains("/calls"))
+        {
+            return "calls";
+        }
+
+        if (path.Contains("/customers"))
+        {
+            return "customers";
+        }
+
+        if (path.Contains("/profile"))
+        {
+            return "customers";
+        }
+
+        if (path.Contains("/reports") || path.Contains("/financial") || path.Contains("/performance"))
+        {
+            return "reports";
+        }
+
+        if (path.Contains("/users") || path.Contains("/admins"))
+        {
+            return "iam";
+        }
+
+        if (path.Contains("/audit") || path.Contains("/security"))
+        {
+            return "audit-security";
+        }
+
+        if (path.Contains("/integrations") || path.Contains("/superadmin/settings") || path.Contains("/superadmin/system-settings"))
+        {
+            return "integrations";
+        }
+
+        if (path.Contains("/settings") || path.Contains("/erp"))
+        {
+            return "integrations";
+        }
+
+        if (path.Contains("/notifications"))
+        {
+            return "notifications";
+        }
+
+        if (path.Contains("/help"))
+        {
+            return "notifications";
+        }
+
+        return null;
+    }
+
+    private bool IsAllowedForRole(string moduleKey, UserRole role)
+    {
+        var module = moduleAccessConfig?.Modules.FirstOrDefault(m =>
+            string.Equals(m.ModuleKey, moduleKey, StringComparison.OrdinalIgnoreCase));
+        if (module == null)
+        {
+            return true;
+        }
+
+        if (!module.IsEnabled)
+        {
+            return false;
+        }
+
+        return role switch
+        {
+            UserRole.Admin => module.RoleAccess.Admin,
+            UserRole.Supervisor => module.RoleAccess.Supervisor,
+            UserRole.Agent => module.RoleAccess.Agent,
+            UserRole.Customer => module.RoleAccess.Customer,
+            UserRole.SuperAdmin => true,
+            _ => false
+        };
+    }
+
+    private bool IsAllowedBySubscription(string moduleKey)
+    {
+        if (tenantSubscription == null || string.IsNullOrWhiteSpace(tenantSubscription.IncludedModulesCsv))
+        {
+            return true;
+        }
+
+        var rawTokens = tenantSubscription.IncludedModulesCsv
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToList();
+
+        if (rawTokens.Count == 0 || rawTokens.Any(t => t.Equals("All", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        var normalized = rawTokens
+            .Select(NormalizeIncludedModuleToken)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return normalized.Contains(moduleKey);
+    }
+
+    private static string NormalizeIncludedModuleToken(string token)
+    {
+        return token.Trim().ToLowerInvariant() switch
+        {
+            "dashboard" => "dashboard",
+            "users" or "iam" or "modulemanagement" => "iam",
+            "catalog" or "inventory" or "products" => "catalog",
+            "orders" or "returns" => "orders",
+            "tickets" or "support" => "tickets",
+            "calls" => "calls",
+            "customers" or "crm" => "customers",
+            "reports" or "analytics" or "financials" => "reports",
+            "audit" or "security" => "audit-security",
+            "integrations" or "erp" or "settings" => "integrations",
+            "notifications" or "help" => "notifications",
+            _ => token.Trim().ToLowerInvariant()
+        };
+    }
+
+    private static bool IsManagedRoute(string path)
+    {
+        if (path.StartsWith("/module-disabled", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/supervisor", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/agent", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/customer", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetRoleFallbackRoute(UserRole role)
+    {
+        return role switch
+        {
+            UserRole.Admin => "/dashboard/admin",
+            UserRole.Supervisor => "/supervisor/dashboard",
+            UserRole.Agent => "/agent/dashboard",
+            UserRole.Customer => "/customer/dashboard",
+            _ => "/dashboard"
+        };
+    }
+
+    public void Dispose()
+    {
+        SignalR.OnDataChanged -= HandleDataChanged;
+    }
+}

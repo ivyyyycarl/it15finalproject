@@ -27,3 +27,20 @@ Thumbs.db
 MonsterASP_Deployment_v[0-9]*.zip
 !MonsterASP_Deployment_v19.zip
 !MonsterASP_Deployment_v20.zip
+
+# Frontend dependencies and generated assets
+**/node_modules/
+**/frontend_publish/
+**/blazor.boot.json
+
+# Local logs and transient outputs
+*.log
+*_output.txt
+build_errors.txt
+error_lines.txt
+seed_log.txt
+
+# Local publish/build artifact directories
+publish_output/
+publish_v*/
+artifacts/

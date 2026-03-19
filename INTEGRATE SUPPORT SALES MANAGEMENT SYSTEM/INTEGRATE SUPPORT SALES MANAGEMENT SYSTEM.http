@@ -1,0 +1,6 @@
+image.png@INTEGRATE_SUPPORT_SALES_MANAGEMENT_SYSTEM_HostAddress = http://localhost:5293
+
+GET {{INTEGRATE_SUPPORT_SALES_MANAGEMENT_SYSTEM_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
